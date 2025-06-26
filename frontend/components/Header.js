@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FaUserGraduate, FaSignOutAlt, FaCog } from 'react-icons/fa';
-import { getCurrentUser, clearAuth, isAdmin } from '../utils/auth';
+import { FaUserGraduate, FaSignOutAlt, FaCog, FaClock } from 'react-icons/fa';
+import { getCurrentUser, logout, isAdmin, getRemainingTime } from '../utils/auth';
 
 const Header = () => {
   const [user, setUser] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(0);
   const router = useRouter();
   const isClient = typeof window !== 'undefined';
 
@@ -14,12 +15,26 @@ const Header = () => {
     if (!isClient) return;
     const currentUser = getCurrentUser();
     setUser(currentUser);
+    
+    // 세션 시간 업데이트
+    const updateRemainingTime = () => {
+      if (currentUser) {
+        setRemainingTime(getRemainingTime());
+      }
+    };
+    
+    updateRemainingTime();
+    const interval = setInterval(updateRemainingTime, 60000); // 1분마다 업데이트
+    
+    return () => clearInterval(interval);
   }, [isClient]);
 
   const handleLogout = () => {
     if (!isClient) return;
-    clearAuth();
-    router.push('/login');
+    
+    if (confirm('정말 로그아웃 하시겠습니까?')) {
+      logout();
+    }
   };
 
   return (
@@ -49,7 +64,13 @@ const Header = () => {
               </button>
 
               {isOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                <div className="absolute right-0 mt-2 w-52 bg-white rounded-md shadow-lg py-1 z-10">
+                  <div className="px-4 py-2 text-xs text-gray-500 border-b">
+                    <div className="flex items-center">
+                      <FaClock className="mr-2" />
+                      세션 만료: {remainingTime}분 남음
+                    </div>
+                  </div>
                   {isAdmin() && (
                     <Link href="/admin">
                       <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">

@@ -3,10 +3,14 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import '../styles/globals.css';
+import { useSessionTimeout, isAuthenticated } from '../utils/auth';
 
 // 클라이언트에서만 렌더링되는 앱 컴포넌트
 const ClientOnlyApp = ({ Component, pageProps }) => {
   const router = useRouter();
+  
+  // 세션 타임아웃 훅 사용
+  useSessionTimeout();
 
   useEffect(() => {
     // Add event listener to fix "ResizeObserver loop limit exceeded" error

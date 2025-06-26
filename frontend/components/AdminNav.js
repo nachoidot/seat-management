@@ -10,8 +10,11 @@ export default function AdminNav() {
 
   const handleLogout = () => {
     if (typeof window === 'undefined') return;
-    logout();
-    router.push('/login');
+    
+    // 확인 다이얼로그
+    if (confirm('정말 로그아웃 하시겠습니까?')) {
+      logout();
+    }
   };
 
   const isActive = (path) => {
@@ -76,8 +79,8 @@ export default function AdminNav() {
             </li>
             <li>
               <button 
-                onClick={logout}
-                className="w-full text-left flex items-center px-5 py-3 hover:bg-secondary"
+                onClick={handleLogout}
+                className="w-full text-left flex items-center px-5 py-3 hover:bg-secondary transition-colors"
               >
                 <FaSignOutAlt className="mr-3" /> 로그아웃
               </button>
