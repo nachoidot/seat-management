@@ -24,7 +24,7 @@ const Footer = () => {
           </div>
           <div className="mt-4 md:mt-0">
             <p className="text-sm">
-              Developed for Graduate Program
+              Developed by Jaeho Choi(AI finance)
             </p>
           </div>
         </div>
