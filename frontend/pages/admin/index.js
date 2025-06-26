@@ -52,27 +52,85 @@ export default function AdminDashboard() {
 
         // 통계 데이터 로드
         setLoading(true);
+        console.log('관리자 대시보드 데이터 로드 시작...');
+        
         const [usersRes, seatsRes, timeslotsRes] = await Promise.all([
-          getUsers().catch(() => ({ data: { data: [] } })),
-          getSeats().catch(() => ({ data: { data: [] } })),
-          getTimeSlots().catch(() => ({ data: { data: [] } }))
+          getUsers().catch(err => {
+            console.error('사용자 데이터 로드 실패:', err);
+            return { success: false, data: { data: [] } };
+          }),
+          getSeats().catch(err => {
+            console.error('좌석 데이터 로드 실패:', err);
+            return { success: false, data: { data: [] } };
+          }),
+          getTimeSlots().catch(err => {
+            console.error('일정 데이터 로드 실패:', err);
+            return { success: false, data: { data: [] } };
+          })
         ]);
 
-        // 데이터가 undefined일 경우 빈 배열로 처리
-        const users = Array.isArray(usersRes?.data?.data) ? usersRes.data.data : [];
-        const seats = Array.isArray(seatsRes?.data?.data) ? seatsRes.data.data : [];
-        const timeslots = Array.isArray(timeslotsRes?.data?.data) ? timeslotsRes.data.data : [];
+        console.log('API 응답 구조:');
+        console.log('Users:', usersRes);
+        console.log('Seats:', seatsRes);
+        console.log('TimeSlots:', timeslotsRes);
+
+        // 데이터 추출 - API 응답 구조에 맞게 처리
+        let users = [];
+        let seats = [];
+        let timeslots = [];
+
+        // 사용자 데이터 처리 (권한 에러 시 무시)
+        if (usersRes?.success !== false) {
+          if (usersRes?.data?.data && Array.isArray(usersRes.data.data)) {
+            users = usersRes.data.data;
+          } else if (usersRes?.data && Array.isArray(usersRes.data)) {
+            users = usersRes.data;
+          }
+        } else {
+          console.warn('사용자 데이터에 접근할 수 없습니다 (권한 문제)');
+        }
+
+        // 좌석 데이터 처리  
+        if (seatsRes?.success !== false) {
+          if (seatsRes?.data?.data && Array.isArray(seatsRes.data.data)) {
+            seats = seatsRes.data.data;
+          } else if (seatsRes?.data && Array.isArray(seatsRes.data)) {
+            seats = seatsRes.data;
+          }
+        }
+
+        // 일정 데이터 처리
+        if (timeslotsRes?.success !== false) {
+          if (timeslotsRes?.data?.data && Array.isArray(timeslotsRes.data.data)) {
+            timeslots = timeslotsRes.data.data;
+          } else if (timeslotsRes?.data && Array.isArray(timeslotsRes.data)) {
+            timeslots = timeslotsRes.data;
+          }
+        }
+
+        console.log('처리된 데이터:');
+        console.log('Users count:', users.length);
+        console.log('Seats count:', seats.length);
+        console.log('TimeSlots count:', timeslots.length);
         
         const assignedSeats = seats.filter(seat => seat.assignedTo);
         const confirmedSeats = assignedSeats.filter(seat => seat.confirmed);
         
-        setStats({
+        console.log('좌석 통계:');
+        console.log('전체 좌석:', seats.length);
+        console.log('배정된 좌석:', assignedSeats.length);
+        console.log('확정된 좌석:', confirmedSeats.length);
+        
+        const newStats = {
           totalSeats: seats.length,
           assignedSeats: assignedSeats.length,
           confirmedSeats: confirmedSeats.length,
           totalUsers: users.length,
           totalTimeSlots: timeslots.length
-        });
+        };
+        
+        console.log('최종 통계:', newStats);
+        setStats(newStats);
       } catch (error) {
         console.error('데이터 로드 오류:', error);
         toast.error('데이터를 불러오는 중 오류가 발생했습니다.');
@@ -128,20 +186,64 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                 <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
-                  <h2 className="text-gray-500 text-lg font-semibold mb-2">총 사용자</h2>
-                  <p className="text-3xl font-bold">{stats.totalUsers}</p>
+                  <div className="flex items-center">
+                    <FaUsers className="text-blue-500 text-2xl mr-3" />
+                    <div>
+                      <h2 className="text-gray-500 text-sm font-semibold mb-1">총 사용자</h2>
+                      <p className="text-2xl font-bold">{stats.totalUsers}</p>
+                      {stats.totalUsers === 0 && (
+                        <p className="text-xs text-red-400">권한 확인 필요</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
-                  <h2 className="text-gray-500 text-lg font-semibold mb-2">총 좌석</h2>
-                  <p className="text-3xl font-bold">{stats.totalSeats}</p>
+                  <div className="flex items-center">
+                    <FaChair className="text-green-500 text-2xl mr-3" />
+                    <div>
+                      <h2 className="text-gray-500 text-sm font-semibold mb-1">총 좌석</h2>
+                      <p className="text-2xl font-bold">{stats.totalSeats}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
+                  <div className="flex items-center">
+                    <FaChair className="text-yellow-500 text-2xl mr-3" />
+                    <div>
+                      <h2 className="text-gray-500 text-sm font-semibold mb-1">배정된 좌석</h2>
+                      <p className="text-2xl font-bold">{stats.assignedSeats}</p>
+                      <p className="text-xs text-gray-400">
+                        {stats.totalSeats > 0 ? Math.round((stats.assignedSeats / stats.totalSeats) * 100) : 0}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+                  <div className="flex items-center">
+                    <FaChair className="text-red-500 text-2xl mr-3" />
+                    <div>
+                      <h2 className="text-gray-500 text-sm font-semibold mb-1">확정된 좌석</h2>
+                      <p className="text-2xl font-bold">{stats.confirmedSeats}</p>
+                      <p className="text-xs text-gray-400">
+                        {stats.assignedSeats > 0 ? Math.round((stats.confirmedSeats / stats.assignedSeats) * 100) : 0}%
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
-                  <h2 className="text-gray-500 text-lg font-semibold mb-2">배정 일정</h2>
-                  <p className="text-3xl font-bold">{stats.totalTimeSlots}</p>
+                  <div className="flex items-center">
+                    <FaCalendarAlt className="text-purple-500 text-2xl mr-3" />
+                    <div>
+                      <h2 className="text-gray-500 text-sm font-semibold mb-1">배정 일정</h2>
+                      <p className="text-2xl font-bold">{stats.totalTimeSlots}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
               

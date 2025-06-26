@@ -11,10 +11,13 @@ const app = express();
 
 // CORS 설정 강화
 const origins = [
-  process.env.FRONTEND_URL,            // Vercel 배포된 프론트 도메인
-  'http://localhost:3000',             // 로컬 개발용(필요 시)
-];
+  process.env.FRONTEND_URL,                                           // 기존 Vercel 도메인
+  'https://seat-management-alpha.vercel.app',                        // 기본 Vercel 도메인
+  'https://seat-management-el5wgnzgi-jaeho-chois-projects.vercel.app', // 새로운 Vercel 도메인
+  'http://localhost:3000',                                            // 로컬 개발용
+].filter(Boolean); // undefined 값 제거
 
+console.log('허용된 CORS Origins:', origins);
 
 app.use(cors({
   origin: origins,
