@@ -14,12 +14,12 @@ exports.login = async (req, res) => {
       birthdateType: typeof birthdate
     });
     
-    // 검증
-    if (!studentId || !name || !birthdate) {
-      console.log('Missing fields');
+    // 검증 - 생년월일은 선택사항
+    if (!studentId || !name) {
+      console.log('Missing required fields');
       return res.status(400).json({
         success: false,
-        message: 'Please provide student ID, name, and birthdate'
+        message: 'Please provide student ID and name'
       });
     }
 
@@ -35,35 +35,34 @@ exports.login = async (req, res) => {
       });
     }
 
-    // 이름과 생년월일 확인
-    console.log('Comparing:', { 
+    // 이름 확인
+    console.log('Comparing names:', { 
       dbName: user.name, 
-      inputName: name, 
-      dbBirthdate: user.birthdate, 
-      inputBirthdate: birthdate 
+      inputName: name
     });
     
-    console.log('문자열 길이 비교:', {
-      dbNameLength: user.name.length,
-      inputNameLength: name.length,
-      dbBirthdateLength: user.birthdate.length,
-      inputBirthdateLength: birthdate.length
-    });
-    
-    console.log('문자열 비교 결과:', {
-      nameMatches: user.name === name,
-      birthdateMatches: user.birthdate === birthdate,
-      nameEqualsIgnoreCase: user.name.toLowerCase() === name.toLowerCase(),
-      nameCharCodes: Array.from(user.name).map(c => c.charCodeAt(0)),
-      inputNameCharCodes: Array.from(name).map(c => c.charCodeAt(0))
-    });
-    
-    if (user.name !== name || user.birthdate !== birthdate) {
-      console.log('Name or birthdate mismatch');
+    if (user.name !== name) {
+      console.log('Name mismatch');
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
+    }
+
+    // 생년월일이 제공된 경우에만 확인 (기존 사용자 호환성)
+    if (birthdate && user.birthdate && user.birthdate.trim() !== '') {
+      console.log('Checking birthdate:', { 
+        dbBirthdate: user.birthdate, 
+        inputBirthdate: birthdate 
+      });
+      
+      if (user.birthdate !== birthdate) {
+        console.log('Birthdate mismatch');
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials'
+        });
+      }
     }
 
     // 여기까지 왔다면 성공

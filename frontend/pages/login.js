@@ -8,8 +8,7 @@ import { toast } from 'react-toastify';
 export default function Login() {
   const [formData, setFormData] = useState({
     studentId: '',
-    name: '',
-    birthdate: ''
+    name: ''
   });
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -32,14 +31,14 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.studentId || !formData.name || !formData.birthdate) {
-      toast.error('모든 필드를 입력해주세요.');
+    if (!formData.studentId || !formData.name) {
+      toast.error('학번과 이름을 모두 입력해주세요.');
       return;
     }
     
     try {
       setLoading(true);
-      const response = await login(formData.studentId, formData.name, formData.birthdate);
+      const response = await login(formData.studentId, formData.name);
       
       if (response.success) {
         setAuth(response.token, response.user);
@@ -70,7 +69,7 @@ export default function Login() {
                 <img src="/images/logo.png" alt="서강대학교 로고" className="h-24 w-auto" />
               </div>
               <h1 className="text-3xl font-bold text-primary">연구실 자리 배정 시스템</h1>
-              <p className="text-gray-600 mt-2">학번/수험번호, 이름, 생년월일로 로그인하세요</p>
+              <p className="text-gray-600 mt-2">학번/수험번호와 이름으로 로그인하세요</p>
             </div>
             
             <form onSubmit={handleSubmit}>
@@ -90,7 +89,7 @@ export default function Login() {
                 />
               </div>
               
-              <div className="mb-4">
+              <div className="mb-6">
                 <label htmlFor="name" className="block text-gray-700 text-sm font-bold mb-2">
                   이름
                 </label>
@@ -106,25 +105,7 @@ export default function Login() {
                 />
               </div>
               
-              <div className="mb-6">
-                <label htmlFor="birthdate" className="block text-gray-700 text-sm font-bold mb-2">
-                  생년월일 (YYYYMMDD)
-                </label>
-                <input
-                  type="text"
-                  id="birthdate"
-                  name="birthdate"
-                  value={formData.birthdate}
-                  onChange={handleChange}
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                  placeholder="생년월일 8자리 (예: 19950101)"
-                  required
-                  pattern="[0-9]{8}"
-                  title="생년월일은 YYYYMMDD 형식의 8자리 숫자로 입력해주세요"
-                />
-              </div>
-              
-              <div className="flex items-center justify-center">
+              <div className="flex items-center justify-between">
                 <button
                   type="submit"
                   className={`bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}

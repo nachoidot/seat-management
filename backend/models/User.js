@@ -14,14 +14,15 @@ const UserSchema = new mongoose.Schema({
   },
   birthdate: {
     type: String,
-    required: [true, 'Please add a birthdate'],
+    required: false, // 선택사항으로 변경
+    default: '', // 기본값을 빈 문자열로 설정
     trim: true
   },
   priority: {
     type: Number,
-    default: 3,  // 1 = highest priority, 3 = regular
+    default: 3,  // 1 = highest priority, 12 = lowest
     min: 1,
-    max: 3
+    max: 12
   },
   isAdmin: {
     type: Boolean,

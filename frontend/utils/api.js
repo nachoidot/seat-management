@@ -25,8 +25,12 @@ api.interceptors.request.use(
 );
 
 // Authentication API calls
-export const login = async (studentId, name, birthdate) => {
-  const response = await api.post('/auth/login', { studentId, name, birthdate });
+export const login = async (studentId, name, birthdate = '') => {
+  const response = await api.post('/auth/login', {
+    studentId,
+    name,
+    birthdate
+  });
   return response.data;
 };
 

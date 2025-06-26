@@ -27,13 +27,48 @@ exports.getUsers = async (req, res) => {
 // @access  Private (Admin only)
 exports.createUser = async (req, res) => {
   try {
-    const user = await User.create(req.body);
+    const { studentId, name, birthdate = '', priority = 3, isAdmin = false } = req.body;
+
+    // 필수 필드 검증 - 생년월일은 선택사항
+    if (!studentId || !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide student ID and name'
+      });
+    }
+
+    // 우선순위 검증
+    if (priority < 1 || priority > 12) {
+      return res.status(400).json({
+        success: false,
+        message: 'Priority must be between 1 and 12'
+      });
+    }
+
+    // 기존 사용자 중복 검사
+    const existingUser = await User.findOne({ studentId });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this student ID already exists'
+      });
+    }
+
+    // 사용자 생성
+    const user = await User.create({
+      studentId,
+      name,
+      birthdate: birthdate || '', // 빈 문자열로 기본값 설정
+      priority,
+      isAdmin
+    });
 
     res.status(201).json({
       success: true,
       data: user
     });
   } catch (err) {
+    console.error('Error creating user:', err);
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors).map(val => val.message);
       return res.status(400).json({
@@ -310,14 +345,8 @@ exports.bulkCreateUsers = async (req, res) => {
       const rowNum = i + 1;
 
       // 필수 필드 검사
-      if (!user.studentId || !user.name || !user.birthdate) {
-        errors.push(`행 ${rowNum}: 학번/수험번호, 이름, 생년월일은 필수입니다`);
-        continue;
-      }
-
-      // 생년월일 형식 검사 (YYYYMMDD)
-      if (!/^\d{8}$/.test(user.birthdate)) {
-        errors.push(`행 ${rowNum}: 생년월일은 YYYYMMDD 형식의 8자리 숫자여야 합니다`);
+      if (!user.studentId || !user.name) {
+        errors.push(`행 ${rowNum}: 학번/수험번호, 이름은 필수입니다`);
         continue;
       }
 
@@ -338,7 +367,7 @@ exports.bulkCreateUsers = async (req, res) => {
       validUsers.push({
         studentId: user.studentId.toString().trim(),
         name: user.name.toString().trim(),
-        birthdate: user.birthdate.toString().trim(),
+        birthdate: user.birthdate ? user.birthdate.toString().trim() : '', // 빈 값 허용
         priority: priority,
         isAdmin: user.isAdmin === 'true' || user.isAdmin === true || false
       });

@@ -24,7 +24,6 @@ export default function AdminUsers() {
   const [newUserData, setNewUserData] = useState({
     studentId: '',
     name: '',
-    birthdate: '',
     priority: 3,
     isAdmin: false
   });
@@ -128,14 +127,8 @@ export default function AdminUsers() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     
-    if (!newUserData.studentId || !newUserData.name || !newUserData.birthdate) {
-      toast.error('학번/수험번호, 이름, 생년월일을 모두 입력해주세요.');
-      return;
-    }
-
-    // 생년월일 형식 확인 (YYYYMMDD)
-    if (!/^\d{8}$/.test(newUserData.birthdate)) {
-      toast.error('생년월일은 YYYYMMDD 형식의 8자리 숫자로 입력해주세요.');
+    if (!newUserData.studentId || !newUserData.name) {
+      toast.error('학번/수험번호와 이름을 모두 입력해주세요.');
       return;
     }
     
@@ -148,7 +141,6 @@ export default function AdminUsers() {
       setNewUserData({
         studentId: '',
         name: '',
-        birthdate: '',
         priority: 3,
         isAdmin: false
       });
@@ -166,7 +158,6 @@ export default function AdminUsers() {
     setNewUserData({
       studentId: user.studentId,
       name: user.name,
-      birthdate: user.birthdate,
       priority: user.priority,
       isAdmin: user.isAdmin
     });
@@ -238,8 +229,6 @@ export default function AdminUsers() {
       'studentId': 'studentId',
       '이름': 'name',
       'name': 'name',
-      '생년월일': 'birthdate',
-      'birthdate': 'birthdate',
       '우선순위': 'priority',
       '유형': 'priority',
       'priority': 'priority',
@@ -344,7 +333,7 @@ export default function AdminUsers() {
   };
 
   const downloadTemplate = () => {
-    const template = '학번,이름,생년월일,우선순위,관리자\n2021001,홍길동,19950101,3,false\n2021002,김철수,19940215,1,false\n2023001,이영희,19960320,2,false\n2023002,박민수,19970815,1,true';
+    const template = '학번,이름,우선순위,관리자\n2021001,홍길동,3,false\n2021002,김철수,1,false\n2023001,이영희,2,false\n2023002,박민수,1,true';
     
     // UTF-8 BOM 추가 (Excel에서 한글 인코딩 문제 해결)
     const BOM = '\uFEFF';
@@ -397,7 +386,6 @@ export default function AdminUsers() {
                   setNewUserData({
                     studentId: '',
                     name: '',
-                    birthdate: '',
                     priority: 3,
                     isAdmin: false
                   });
@@ -633,24 +621,6 @@ export default function AdminUsers() {
               </div>
               
               <div className="mb-4">
-                <label htmlFor="birthdate" className="block text-gray-700 text-sm font-bold mb-2">
-                  생년월일 (YYYYMMDD)
-                </label>
-                <input
-                  type="text"
-                  id="birthdate"
-                  name="birthdate"
-                  value={newUserData.birthdate}
-                  onChange={handleInputChange}
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                  placeholder="생년월일 8자리 (예: 19950101)"
-                  required
-                  pattern="[0-9]{8}"
-                  title="생년월일은 YYYYMMDD 형식의 8자리 숫자로 입력해주세요"
-                />
-              </div>
-              
-              <div className="mb-4">
                 <label htmlFor="priority" className="block text-gray-700 text-sm font-bold mb-2">
                   유형
                 </label>
@@ -746,24 +716,6 @@ export default function AdminUsers() {
                   className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   placeholder="이름을 입력하세요"
                   required
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="birthdate" className="block text-gray-700 text-sm font-bold mb-2">
-                  생년월일 (YYYYMMDD)
-                </label>
-                <input
-                  type="text"
-                  id="birthdate"
-                  name="birthdate"
-                  value={newUserData.birthdate}
-                  onChange={handleInputChange}
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                  placeholder="생년월일 8자리 (예: 19950101)"
-                  required
-                  pattern="[0-9]{8}"
-                  title="생년월일은 YYYYMMDD 형식의 8자리 숫자로 입력해주세요"
                 />
               </div>
               
