@@ -315,10 +315,22 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
       
       {hoveredSeat && hoveredSeat.assignedTo && (
         <div
-          className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded-md"
-          style={{ pointerEvents: 'none' }}
+          style={{
+            position: 'fixed',
+            top: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            background: '#FEF9C3',
+            border: '1px solid #FDE68A',
+            borderRadius: 8,
+            padding: 12,
+            minWidth: 200,
+            textAlign: 'center'
+          }}
         >
-          <p className="text-yellow-800">
+          <p style={{ color: '#B45309' }}>
             <strong>학번:</strong> {hoveredSeat.assignedTo}
             {hoveredSeat.confirmed && ' (확정)'}
           </p>
