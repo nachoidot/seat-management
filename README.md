@@ -18,7 +18,7 @@
 ## 🚀 배포
 
 - 프론트엔드: **Vercel**
-- 백엔드: **Render**
+- 백엔드: **cloudtype**
 - 데이터베이스: **MongoDB Atlas**
 
 ## 🏗 프로젝트 구조
