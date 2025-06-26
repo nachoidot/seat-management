@@ -201,7 +201,7 @@ export default function AdminUsers() {
               <FaPlus className="mr-2" /> 사용자 추가
             </button>
           </div>
-          
+          <pre>{JSON.stringify(users, null, 2)}</pre>
           {loading ? (
             <div className="text-center py-12">
               <p className="text-gray-600">데이터를 불러오는 중...</p>
