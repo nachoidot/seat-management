@@ -2,18 +2,20 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import AdminNav from '../../components/AdminNav';
-import { getUsers, createUser, deleteUser, updateUser, bulkCreateUsers } from '../../utils/api';
+import { getUsers, createUser, deleteUser, updateUser, bulkCreateUsers, bulkDeleteUsers } from '../../utils/api';
 import { isAuthenticated, getCurrentUser } from '../../utils/auth';
 import { toast } from 'react-toastify';
-import { FaPlus, FaTrash, FaEdit, FaUserShield, FaUser, FaUpload, FaDownload } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaEdit, FaUserShield, FaUser, FaUpload, FaDownload, FaTrashAlt, FaCheckSquare, FaSquare } from 'react-icons/fa';
 import { ClientOnly } from '../../utils/client-only';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -64,11 +66,54 @@ export default function AdminUsers() {
       setLoading(true);
       const response = await getUsers();
       setUsers(response.data || []);
+      setSelectedUsers([]); // 사용자 목록이 새로고침되면 선택 초기화
     } catch (error) {
       console.error('사용자 로드 오류:', error);
       toast.error('사용자 정보를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 체크박스 관련 함수들
+  const handleSelectUser = (studentId) => {
+    setSelectedUsers(prev => 
+      prev.includes(studentId) 
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    const nonAdminUsers = users.filter(user => !user.isAdmin);
+    if (selectedUsers.length === nonAdminUsers.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(nonAdminUsers.map(user => user.studentId));
+    }
+  };
+
+  // 일괄 삭제 관련 함수들
+  const handleBulkDelete = async (type, options = {}) => {
+    try {
+      setIsSubmitting(true);
+      console.log('일괄 삭제 시작:', { type, options });
+      
+      const response = await bulkDeleteUsers(options);
+      console.log('일괄 삭제 응답:', response);
+      
+      toast.success(response.message || '사용자가 삭제되었습니다.');
+      setSelectedUsers([]);
+      setShowBulkDeleteModal(false);
+      await loadUsers();
+    } catch (error) {
+      console.error('일괄 삭제 오류:', error);
+      console.error('오류 응답:', error.response?.data);
+      
+      const errorMessage = error.response?.data?.message || error.message || '일괄 삭제 중 오류가 발생했습니다.';
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -412,62 +457,136 @@ export default function AdminUsers() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">학번/수험번호</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">생년월일</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">유형</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">권한</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {users.map((user) => (
-                      <tr key={user._id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.studentId}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.birthdate}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                            {user.priority}유형
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {user.isAdmin ? 
-                            <span className="flex items-center text-blue-600">
-                              <FaUserShield className="mr-1" /> 관리자
-                            </span> : 
-                            <span className="flex items-center text-gray-600">
-                              <FaUser className="mr-1" /> 일반 사용자
-                            </span>
-                          }
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            <button 
-                              onClick={() => handleEditUser(user)}
-                              className="text-indigo-600 hover:text-indigo-900" 
-                              title="수정"
-                            >
-                              <FaEdit />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteClick(user)}
-                              className="text-red-600 hover:text-red-900" 
-                              title="삭제"
-                            >
-                              <FaTrash />
-                            </button>
-                          </div>
-                        </td>
+            <div className="space-y-4">
+              {/* 일괄 작업 버튼들 */}
+              {selectedUsers.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-800 font-medium">
+                      {selectedUsers.length}명이 선택되었습니다
+                    </span>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setShowBulkDeleteModal(true)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center"
+                      >
+                        <FaTrashAlt className="mr-2" />
+                        선택 삭제
+                      </button>
+                      <button
+                        onClick={() => setSelectedUsers([])}
+                        className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+                      >
+                        선택 해제
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    사용자 목록 ({users.length}명)
+                  </h3>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`모든 사용자(${users.filter(u => !u.isAdmin).length}명)를 정말 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 모든 좌석 배정도 해제됩니다.`)) {
+                          handleBulkDelete('all', { deleteAll: true });
+                        }
+                      }}
+                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded flex items-center text-sm"
+                      disabled={users.filter(u => !u.isAdmin).length === 0}
+                    >
+                      <FaTrashAlt className="mr-2" />
+                      전체 삭제 ({users.filter(u => !u.isAdmin).length}명)
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <button
+                            onClick={handleSelectAll}
+                            className="flex items-center"
+                          >
+                            {selectedUsers.length === users.filter(u => !u.isAdmin).length && users.filter(u => !u.isAdmin).length > 0 ? 
+                              <FaCheckSquare className="text-blue-600" /> : 
+                              <FaSquare className="text-gray-400" />
+                            }
+                          </button>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">학번/수험번호</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">생년월일</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">우선순위</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">권한</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {users.map((user) => (
+                        <tr key={user._id} className={`hover:bg-gray-50 ${selectedUsers.includes(user.studentId) ? 'bg-blue-50' : ''}`}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {!user.isAdmin && (
+                              <button
+                                onClick={() => handleSelectUser(user.studentId)}
+                                className="flex items-center"
+                              >
+                                {selectedUsers.includes(user.studentId) ? 
+                                  <FaCheckSquare className="text-blue-600" /> : 
+                                  <FaSquare className="text-gray-400" />
+                                }
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.studentId}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.birthdate}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {user.priority}순위
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {user.isAdmin ? 
+                              <span className="flex items-center text-blue-600">
+                                <FaUserShield className="mr-1" /> 관리자
+                              </span> : 
+                              <span className="flex items-center text-gray-600">
+                                <FaUser className="mr-1" /> 일반 사용자
+                              </span>
+                            }
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <button 
+                                onClick={() => handleEditUser(user)}
+                                className="text-indigo-600 hover:text-indigo-900" 
+                                title="수정"
+                              >
+                                <FaEdit />
+                              </button>
+                              {!user.isAdmin && (
+                                <button 
+                                  onClick={() => handleDeleteClick(user)}
+                                  className="text-red-600 hover:text-red-900" 
+                                  title="삭제"
+                                >
+                                  <FaTrash />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -729,6 +848,38 @@ export default function AdminUsers() {
               <button
                 type="button"
                 onClick={handleDeleteUser}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? '처리중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 일괄 삭제 확인 모달 */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-4 text-red-600">일괄 삭제 확인</h2>
+            <p className="mb-6 text-gray-700">
+              선택된 <strong>{selectedUsers.length}명</strong>의 사용자를 정말 삭제하시겠습니까? 
+              <br />
+              <span className="text-red-600 font-semibold">이 작업은 되돌릴 수 없으며, 해당 사용자들에게 배정된 좌석도 모두 해제됩니다.</span>
+            </p>
+            
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(false)}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded mr-2"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkDelete('selected', { userIds: selectedUsers })}
                 className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
                 disabled={isSubmitting}
               >

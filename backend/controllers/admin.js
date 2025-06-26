@@ -495,4 +495,61 @@ exports.getSeatAssignmentStats = async (req, res) => {
       error: error.message
     });
   }
+};
+
+// @desc    Bulk delete users
+// @route   POST /api/admin/users/bulk-delete
+// @access  Private (Admin only)
+exports.bulkDeleteUsers = async (req, res) => {
+  try {
+    const { userIds, deleteAll } = req.body;
+    
+    let filter = {};
+    
+    if (deleteAll) {
+      // 모든 사용자 삭제 (관리자 제외)
+      filter = { isAdmin: { $ne: true } };
+    } else if (userIds && userIds.length > 0) {
+      // 특정 사용자들 삭제
+      filter = { 
+        studentId: { $in: userIds },
+        isAdmin: { $ne: true } // 관리자는 삭제 불가
+      };
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide userIds or set deleteAll to true'
+      });
+    }
+
+    // 해당 사용자들에게 배정된 좌석 해제
+    const usersToDelete = await User.find(filter);
+    const studentIdsToDelete = usersToDelete.map(user => user.studentId);
+    
+    if (studentIdsToDelete.length > 0) {
+      await Seat.updateMany(
+        { assignedTo: { $in: studentIdsToDelete } },
+        { assignedTo: null, confirmed: false, updatedAt: Date.now() }
+      );
+    }
+
+    // 사용자 삭제
+    const result = await User.deleteMany(filter);
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount}명의 사용자가 삭제되었습니다.`,
+      data: {
+        deletedCount: result.deletedCount,
+        seatUnassignments: studentIdsToDelete.length
+      }
+    });
+  } catch (error) {
+    console.error('Error bulk deleting users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
 }; 

@@ -128,6 +128,12 @@ export const bulkCreateUsers = async (users) => {
   return response.data;
 };
 
+// 사용자 일괄 삭제
+export const bulkDeleteUsers = async (options = {}) => {
+  const response = await api.post('/admin/users/bulk-delete', options);
+  return response.data;
+};
+
 export const resetSeats = async () => {
   const response = await api.put('/admin/seats/reset');
   return response.data;

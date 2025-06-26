@@ -5,6 +5,7 @@ const {
   resetAllSeats, 
   exportSeats,
   bulkCreateUsers,
+  bulkDeleteUsers,
   bulkConfirmSeats,
   getSeatAssignmentStats
 } = require('../controllers/admin');
@@ -19,6 +20,7 @@ router.use(authorize(true));
 // 사용자 관련 라우트
 router.get('/users', getUsers);
 router.post('/users/bulk', bulkCreateUsers);
+router.post('/users/bulk-delete', bulkDeleteUsers);
 
 // 좌석 관련 라우트  
 router.get('/seats', getSeats);
