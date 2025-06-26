@@ -10,8 +10,21 @@ dotenv.config();
 const app = express();
 
 // CORS 설정 강화
+const origins = [
+  process.env.FRONTEND_URL,            // Vercel 배포된 프론트 도메인
+  'http://localhost:3000',             // 로컬 개발용(필요 시)
+];
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  origin: origins,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  credentials: true,
+}));
+
+// preflight(OPTIONS) 요청도 CORS 적용
+app.options('*', cors({
+  origin: origins,
   credentials: true
 }));
 
