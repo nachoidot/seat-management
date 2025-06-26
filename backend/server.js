@@ -15,6 +15,7 @@ const origins = [
   'http://localhost:3000',             // 로컬 개발용(필요 시)
 ];
 
+
 app.use(cors({
   origin: origins,
   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
