@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import '../styles/globals.css';
 import { useSessionTimeout, isAuthenticated } from '../utils/auth';
+import { autoWakeUpOnLoad, startKeepAlive } from '../utils/wakeup';
 
 // 클라이언트에서만 렌더링되는 앱 컴포넌트
 const ClientOnlyApp = ({ Component, pageProps }) => {
@@ -25,8 +26,14 @@ const ClientOnlyApp = ({ Component, pageProps }) => {
     
     window.addEventListener('error', resizeObserverError);
 
+    // 🤖 서버 Wake-up 시작
+    autoWakeUpOnLoad();
+    const stopKeepAlive = startKeepAlive(4); // 4분마다 Keep-alive
+
     return () => {
       window.removeEventListener('error', resizeObserverError);
+      // Keep-alive 정리
+      if (stopKeepAlive) stopKeepAlive();
     };
   }, []);
 

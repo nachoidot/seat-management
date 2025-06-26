@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+import { ensureServerAwake } from './wakeup';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Create axios instance
@@ -41,6 +43,9 @@ export const getMe = async () => {
 
 // Seats API calls
 export const getSeats = async () => {
+  // 서버 Wake-up 확인
+  await ensureServerAwake();
+  
   const response = await api.get('/seats');
   return response.data;
 };
@@ -79,6 +84,9 @@ export const getSeatAssignmentStats = async () => {
 
 // TimeSlots API calls
 export const getTimeSlots = async () => {
+  // 서버 Wake-up 확인
+  await ensureServerAwake();
+  
   const response = await api.get('/timeslots');
   return response.data;
 };

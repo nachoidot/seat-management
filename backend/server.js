@@ -137,6 +137,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/seats', seatRoutes);
 app.use('/api/timeslots', timeslotRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/health', require('./routes/health'));
 
 // 데이터 진단용 API 경로 추가
 app.get('/api/debug/stats', async (req, res) => {
