@@ -111,6 +111,11 @@ export const deleteUser = async (id) => {
   return response.data;
 };
 
+export const bulkCreateUsers = async (users) => {
+  const response = await api.post('/admin/users/bulk', { users });
+  return response.data;
+};
+
 export const resetSeats = async () => {
   const response = await api.put('/admin/seats/reset');
   return response.data;

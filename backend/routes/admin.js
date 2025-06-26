@@ -6,7 +6,8 @@ const {
   deleteUser, 
   resetSeats, 
   exportSeats, 
-  createBatchSeats 
+  createBatchSeats,
+  bulkCreateUsers
 } = require('../controllers/admin');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -19,6 +20,7 @@ router.use(authorize(true));
 // User management routes
 router.get('/users', getUsers);
 router.post('/users', createUser);
+router.post('/users/bulk', bulkCreateUsers);
 router.put('/users/:id', updateUser);
 router.delete('/users/:id', deleteUser);
 

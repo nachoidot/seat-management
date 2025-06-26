@@ -260,4 +260,101 @@ exports.createBatchSeats = async (req, res) => {
       });
     }
   }
+};
+
+// @desc    Bulk create users from CSV
+// @route   POST /api/admin/users/bulk
+// @access  Private (Admin only)
+exports.bulkCreateUsers = async (req, res) => {
+  try {
+    const { users } = req.body;
+
+    if (!users || !Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an array of users'
+      });
+    }
+
+    // 데이터 유효성 검사
+    const validUsers = [];
+    const errors = [];
+
+    for (let i = 0; i < users.length; i++) {
+      const user = users[i];
+      const rowNum = i + 1;
+
+      // 필수 필드 검사
+      if (!user.studentId || !user.name || !user.birthdate) {
+        errors.push(`행 ${rowNum}: 학번/수험번호, 이름, 생년월일은 필수입니다`);
+        continue;
+      }
+
+      // 생년월일 형식 검사 (YYYYMMDD)
+      if (!/^\d{8}$/.test(user.birthdate)) {
+        errors.push(`행 ${rowNum}: 생년월일은 YYYYMMDD 형식의 8자리 숫자여야 합니다`);
+        continue;
+      }
+
+      // 우선순위 검사
+      const priority = parseInt(user.priority);
+      if (!priority || priority < 1 || priority > 12) {
+        errors.push(`행 ${rowNum}: 우선순위는 1-12 사이의 숫자여야 합니다`);
+        continue;
+      }
+
+      // 기존 사용자 중복 검사
+      const existingUser = await User.findOne({ studentId: user.studentId });
+      if (existingUser) {
+        errors.push(`행 ${rowNum}: 학번/수험번호 ${user.studentId}는 이미 존재합니다`);
+        continue;
+      }
+
+      validUsers.push({
+        studentId: user.studentId.toString().trim(),
+        name: user.name.toString().trim(),
+        birthdate: user.birthdate.toString().trim(),
+        priority: priority,
+        isAdmin: user.isAdmin === 'true' || user.isAdmin === true || false
+      });
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: '다음 오류를 수정해 주세요:',
+        errors: errors
+      });
+    }
+
+    if (validUsers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '유효한 사용자 데이터가 없습니다'
+      });
+    }
+
+    // 사용자 일괄 생성
+    const createdUsers = await User.insertMany(validUsers);
+
+    res.status(201).json({
+      success: true,
+      message: `${createdUsers.length}명의 사용자가 성공적으로 등록되었습니다`,
+      count: createdUsers.length,
+      data: createdUsers
+    });
+
+  } catch (err) {
+    console.error('Bulk user creation error:', err);
+    if (err.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: '중복된 학번/수험번호가 있습니다'
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 }; 

@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import AdminNav from '../../components/AdminNav';
-import { getUsers, createUser, deleteUser, updateUser } from '../../utils/api';
+import { getUsers, createUser, deleteUser, updateUser, bulkCreateUsers } from '../../utils/api';
 import { isAuthenticated, getCurrentUser } from '../../utils/auth';
 import { toast } from 'react-toastify';
-import { FaPlus, FaTrash, FaEdit, FaUserShield, FaUser } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaEdit, FaUserShield, FaUser, FaUpload, FaDownload } from 'react-icons/fa';
 import { ClientOnly } from '../../utils/client-only';
 
 export default function AdminUsers() {
@@ -14,7 +14,11 @@ export default function AdminUsers() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [csvData, setCsvData] = useState([]);
+  const [csvErrors, setCsvErrors] = useState([]);
   const [newUserData, setNewUserData] = useState({
     studentId: '',
     name: '',
@@ -174,6 +178,141 @@ export default function AdminUsers() {
     }
   };
 
+  // CSV 파일 처리 함수
+  const parseCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return [];
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const data = [];
+
+    // 헤더 매핑
+    const headerMap = {
+      '학번': 'studentId',
+      '수험번호': 'studentId',
+      'studentId': 'studentId',
+      '이름': 'name',
+      'name': 'name',
+      '생년월일': 'birthdate',
+      'birthdate': 'birthdate',
+      '우선순위': 'priority',
+      '유형': 'priority',
+      'priority': 'priority',
+      '관리자': 'isAdmin',
+      'isAdmin': 'isAdmin'
+    };
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+      const row = {};
+      
+      headers.forEach((header, index) => {
+        const mappedKey = headerMap[header];
+        if (mappedKey && values[index]) {
+          row[mappedKey] = values[index];
+        }
+      });
+
+      if (row.studentId || row.name) {
+        data.push(row);
+      }
+    }
+
+    return data;
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const files = [...e.dataTransfer.files];
+    handleFiles(files);
+  };
+
+  const handleFileInput = (e) => {
+    const files = [...e.target.files];
+    handleFiles(files);
+  };
+
+  const handleFiles = (files) => {
+    const file = files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast.error('CSV 파일만 업로드 가능합니다.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const data = parseCSV(text);
+        
+        if (data.length === 0) {
+          toast.error('유효한 데이터가 없습니다.');
+          return;
+        }
+
+        setCsvData(data);
+        setCsvErrors([]);
+        setShowBulkModal(true);
+      } catch (error) {
+        console.error('CSV 파싱 오류:', error);
+        toast.error('CSV 파일을 읽는 중 오류가 발생했습니다.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleBulkSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      const response = await bulkCreateUsers(csvData);
+      
+      toast.success(response.message);
+      setShowBulkModal(false);
+      setCsvData([]);
+      setCsvErrors([]);
+      await loadUsers();
+    } catch (error) {
+      console.error('일괄 업로드 오류:', error);
+      if (error.response?.data?.errors) {
+        setCsvErrors(error.response.data.errors);
+      } else {
+        toast.error(error.response?.data?.message || '일괄 업로드 중 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const template = '학번,이름,생년월일,우선순위,관리자\n2021001,홍길동,19950101,3,false\n2021002,김철수,19940215,1,false';
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'user_template.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   return (
     <Layout title="사용자 관리 - 연구실 자리 배정 시스템">
       <ClientOnly>
@@ -185,21 +324,40 @@ export default function AdminUsers() {
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-primary">사용자 관리</h1>
             
-            <button 
-              onClick={() => {
-                setNewUserData({
-                  studentId: '',
-                  name: '',
-                  birthdate: '',
-                  priority: 3,
-                  isAdmin: false
-                });
-                setShowAddModal(true);
-              }}
-              className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center"
-            >
-              <FaPlus className="mr-2" /> 사용자 추가
-            </button>
+            <div className="flex space-x-2">
+              <button 
+                onClick={downloadTemplate}
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center"
+              >
+                <FaDownload className="mr-2" /> CSV 템플릿
+              </button>
+              
+              <label className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded flex items-center cursor-pointer">
+                <FaUpload className="mr-2" /> CSV 업로드
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileInput}
+                  className="hidden"
+                />
+              </label>
+              
+              <button 
+                onClick={() => {
+                  setNewUserData({
+                    studentId: '',
+                    name: '',
+                    birthdate: '',
+                    priority: 3,
+                    isAdmin: false
+                  });
+                  setShowAddModal(true);
+                }}
+                className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center"
+              >
+                <FaPlus className="mr-2" /> 사용자 추가
+              </button>
+            </div>
           </div>
           
           {loading ? (
@@ -209,12 +367,44 @@ export default function AdminUsers() {
           ) : users.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-8 text-center">
               <p className="text-gray-600 text-lg mb-4">등록된 사용자가 없습니다</p>
-              <button 
-                onClick={() => setShowAddModal(true)}
-                className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              
+              {/* 드래그앤드롭 영역 */}
+              <div 
+                className={`border-2 border-dashed rounded-lg p-8 mb-4 transition-colors ${
+                  dragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
               >
-                사용자 추가하기
-              </button>
+                <FaUpload className="mx-auto text-4xl text-gray-400 mb-4" />
+                <p className="text-gray-600 mb-2">CSV 파일을 여기로 끌어다 놓거나</p>
+                <label className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded cursor-pointer">
+                  파일 선택
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileInput}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              
+              <div className="flex justify-center space-x-2">
+                <button 
+                  onClick={downloadTemplate}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                >
+                  <FaDownload className="mr-2" /> CSV 템플릿 다운로드
+                </button>
+                <button 
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                >
+                  개별 사용자 추가
+                </button>
+              </div>
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -538,6 +728,76 @@ export default function AdminUsers() {
                 disabled={isSubmitting}
               >
                 {isSubmitting ? '처리중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSV 일괄 업로드 모달 */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4">CSV 일괄 업로드</h2>
+            
+            {csvErrors.length > 0 && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                <h3 className="font-bold">오류가 발견되었습니다:</h3>
+                <ul className="list-disc list-inside mt-2">
+                  {csvErrors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold mb-2">미리보기 ({csvData.length}개 행)</h3>
+              <div className="overflow-x-auto max-h-96">
+                <table className="min-w-full divide-y divide-gray-200 border">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">학번/수험번호</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">이름</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">생년월일</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">우선순위</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">관리자</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {csvData.map((row, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm text-gray-900">{row.studentId || '-'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-900">{row.name || '-'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-900">{row.birthdate || '-'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-900">{row.priority || '-'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-900">{row.isAdmin || 'false'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkModal(false);
+                  setCsvData([]);
+                  setCsvErrors([]);
+                }}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkSubmit}
+                className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                disabled={isSubmitting || csvErrors.length > 0}
+              >
+                {isSubmitting ? '업로드 중...' : `${csvData.length}명 일괄 등록`}
               </button>
             </div>
           </div>
