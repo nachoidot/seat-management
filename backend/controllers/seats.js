@@ -93,19 +93,81 @@ exports.assignSeat = async (req, res) => {
       });
     }
 
-    // Check if current time is within the allowed time slot for this user's priority
-    const now = new Date();
-    const timeSlot = await TimeSlot.findOne({
-      priority: user.priority,
-      openTime: { $lte: now },
-      closeTime: { $gte: now }
-    });
-
-    if (!timeSlot && !user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'You cannot register at this time'
-      });
+    // 새로운 접근 규칙 적용
+    if (!user.isAdmin) {
+      const now = new Date();
+      
+      // 활성화된 일정 찾기
+      const timeSlot = await TimeSlot.findOne({ active: true }).sort({ baseDate: -1 });
+      
+      if (!timeSlot) {
+        return res.status(403).json({
+          success: false,
+          message: '현재 활성화된 배정 일정이 없습니다.'
+        });
+      }
+      
+      const baseDate = new Date(timeSlot.baseDate);
+      const endDate = new Date(timeSlot.endDate);
+      endDate.setHours(23, 59, 59, 999); // 종료일의 마지막 시간
+      
+      // 배정 일정이 종료되었으면 접근 불가
+      if (now > endDate) {
+        return res.status(403).json({
+          success: false,
+          message: '배정 일정이 종료되었습니다.'
+        });
+      }
+      
+      // 15:00 시간 계산
+      const commonAccessTime = new Date(baseDate);
+      commonAccessTime.setHours(15, 0, 0, 0);
+      
+      let canAccess = false;
+      
+      // 1순위와 12순위는 15:00부터 접근 가능
+      if (user.priority === 1 || user.priority === 12) {
+        canAccess = now >= commonAccessTime;
+      } else {
+        // 나머지 우선순위는 자신의 배정시간 또는 15:00 이후 접근 가능
+        const ownStartTime = new Date(baseDate);
+        const ownEndTime = new Date(baseDate);
+        
+        // 우선순위별 시간 설정
+        const priorityTimes = {
+          11: { hour: 10, minute: 0 },
+          10: { hour: 10, minute: 30 },
+          9: { hour: 11, minute: 0 },
+          8: { hour: 11, minute: 30 },
+          7: { hour: 12, minute: 0 },
+          6: { hour: 12, minute: 30 },
+          5: { hour: 13, minute: 0 },
+          4: { hour: 13, minute: 30 },
+          3: { hour: 14, minute: 0 },
+          2: { hour: 14, minute: 30 },
+          1: { hour: 15, minute: 0 },
+          12: { hour: 15, minute: 0 }  // 15:00으로 통일
+        };
+        
+        if (priorityTimes[user.priority]) {
+          const { hour, minute } = priorityTimes[user.priority];
+          ownStartTime.setHours(hour, minute, 0, 0);
+          ownEndTime.setHours(hour, minute, 30, 0);
+          
+          // 자신의 배정시간 내에 있거나 15:00 이후인 경우
+          canAccess = (now >= ownStartTime && now <= ownEndTime) || now >= commonAccessTime;
+        } else {
+          // 우선순위가 정의되지 않은 경우 15:00 이후만 접근 가능
+          canAccess = now >= commonAccessTime;
+        }
+      }
+      
+      if (!canAccess) {
+        return res.status(403).json({
+          success: false,
+          message: '현재 시간에 좌석 배정 권한이 없습니다.'
+        });
+      }
     }
 
     // Check if seat is available

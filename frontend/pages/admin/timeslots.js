@@ -7,7 +7,14 @@ import { isAuthenticated, getCurrentUser } from '../../utils/auth';
 import { toast } from 'react-toastify';
 import { FaPlus, FaTrash, FaEdit, FaCalendarAlt, FaInfoCircle } from 'react-icons/fa';
 import { ClientOnly } from '../../utils/client-only';
-import timeUtils, { getPriorityLabel, formatTime } from '../../utils/timeUtils';
+import timeUtils, { 
+  getPriorityLabel, 
+  formatTime, 
+  calculateStartTimeByPriority,
+  calculateEndTimeByPriority,
+  calculateCommonAccessTime,
+  getUserAccessTimeSlots
+} from '../../utils/timeUtils';
 
 export default function AdminTimeSlots() {
   const [timeSlots, setTimeSlots] = useState([]);
@@ -280,20 +287,67 @@ export default function AdminTimeSlots() {
   // 유형별 시간 정보 요약
   const getPriorityTimeInfo = () => {
     return Object.keys(timeUtils.PRIORITY_LABELS).map(priority => {
-      const { hour, minute } = timeUtils.PRIORITY_TIMES[priority];
-      const startTime = new Date();
-      startTime.setHours(hour, minute, 0, 0);
+      const priorityNum = parseInt(priority);
+      const { hour, minute } = timeUtils.PRIORITY_TIMES[priorityNum];
       
-      const endTime = new Date(startTime);
-      endTime.setMinutes(endTime.getMinutes() + 30);
+      let description = '';
+      if (priorityNum === 1 || priorityNum === 12) {
+        description = '15:00부터 배정 일정 종료까지';
+      } else {
+        const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const endMinute = minute + 30;
+        const endHour = hour + Math.floor(endMinute / 60);
+        const endMinuteFinal = endMinute % 60;
+        const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteFinal.toString().padStart(2, '0')}`;
+        description = `${startTime}~${endTime} + 15:00 이후`;
+      }
       
       return {
-        priority: parseInt(priority),
-        label: timeUtils.PRIORITY_LABELS[priority],
-        startTime: formatTime(startTime),
-        endTime: formatTime(endTime)
+        priority: priorityNum,
+        label: timeUtils.PRIORITY_LABELS[priorityNum],
+        description
       };
-    }).sort((a, b) => b.priority - a.priority); // 유형 높은 순서대로 정렬
+    }).sort((a, b) => a.priority - b.priority);
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).format(date);
+  };
+
+  const getAccessTimeDisplay = (timeSlot) => {
+    if (!timeSlot || !timeSlot.baseDate || !timeSlot.endDate) return '시간 미정';
+    
+    const baseDate = new Date(timeSlot.baseDate);
+    const endDate = new Date(timeSlot.endDate);
+    
+    // 모든 우선순위의 접근 시간 구간들을 계산
+    const allAccessTimes = [];
+    
+    for (let priority = 1; priority <= 12; priority++) {
+      const accessSlots = getUserAccessTimeSlots(baseDate, priority, endDate);
+      if (accessSlots.length > 0) {
+        const priorityLabel = getPriorityLabel(priority);
+        const timeRanges = accessSlots.map(slot => {
+          const startTime = formatDateTime(slot.start);
+          const endTime = formatDateTime(slot.end);
+          const typeLabel = slot.type === 'own' ? '자신의 시간' : '15:00 이후';
+          return `${startTime}~${endTime} (${typeLabel})`;
+        }).join(', ');
+        
+        allAccessTimes.push(`${priorityLabel}: ${timeRanges}`);
+      }
+    }
+    
+    return allAccessTimes.length > 0 ? allAccessTimes.join('; ') : '시간 미정';
   };
 
   return (
@@ -692,7 +746,7 @@ export default function AdminTimeSlots() {
                         <div className="text-sm text-gray-900">{info.label}</div>
                       </td>
                       <td className="px-6 py-2 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{info.startTime} ~ {info.endTime}</div>
+                        <div className="text-sm text-gray-900">{info.description}</div>
                       </td>
                     </tr>
                   ))}

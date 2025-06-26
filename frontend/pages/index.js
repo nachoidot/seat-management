@@ -5,7 +5,14 @@ import Layout from '../components/Layout';
 import { getSeats, getTimeSlots } from '../utils/api';
 import { useAuth, getCurrentUser } from '../utils/auth';
 import { toast } from 'react-toastify';
-import timeUtils, { calculateStartTimeByPriority, calculateEndTimeByPriority, getPriorityLabel } from '../utils/timeUtils';
+import timeUtils, { 
+  calculateStartTimeByPriority, 
+  calculateEndTimeByPriority, 
+  calculateCommonAccessTime,
+  canUserAccessSeats,
+  getUserAccessTimeSlots,
+  getPriorityLabel 
+} from '../utils/timeUtils';
 
 // 클라이언트 사이드에서만 렌더링되도록 SeatGrid를 dynamic import
 const SeatGrid = dynamic(() => import('../components/SeatGrid'), {
@@ -53,7 +60,8 @@ export default function Home() {
           const baseDate = new Date(slot.baseDate);
           priorityTimes[priority] = {
             openTime: calculateStartTimeByPriority(baseDate, priority),
-            closeTime: calculateEndTimeByPriority(baseDate, priority)
+            closeTime: calculateEndTimeByPriority(baseDate, priority),
+            commonAccessTime: calculateCommonAccessTime(baseDate)
           };
         }
         
@@ -65,8 +73,8 @@ export default function Home() {
 
       setTimeSlots(enhancedTimeSlots);
       
-      // 현재 사용자의 우선순위에 해당하는 시간 슬롯 찾기
-      if (currentUser && enhancedTimeSlots.length > 0) {
+      // 사용자의 접근 가능 시간 설정
+      if (enhancedTimeSlots.length > 0) {
         // 가장 최근 활성화된 일정 찾기
         const activeSlots = enhancedTimeSlots.filter(slot => slot.active);
         if (activeSlots.length > 0) {
@@ -74,13 +82,18 @@ export default function Home() {
             return new Date(current.baseDate) > new Date(latest.baseDate) ? current : latest;
           }, activeSlots[0]);
           
-          // 사용자 우선순위에 해당하는 시간 계산
+          // 사용자 우선순위에 해당하는 접근 가능 시간 구간들 계산
           const userPriority = currentUser.priority || 3; // 기본값 3으로 설정
-          if (latestSlot.priorityTimes && latestSlot.priorityTimes[userPriority]) {
+          const accessTimeSlots = getUserAccessTimeSlots(
+            new Date(latestSlot.baseDate), 
+            userPriority, 
+            new Date(latestSlot.endDate)
+          );
+          
+          if (accessTimeSlots.length > 0) {
             setUserTimeSlot({
               ...latestSlot,
-              openTime: latestSlot.priorityTimes[userPriority].openTime,
-              closeTime: latestSlot.priorityTimes[userPriority].closeTime
+              accessTimeSlots
             });
           }
         }
@@ -111,11 +124,14 @@ export default function Home() {
   const canUserRegister = () => {
     if (!userTimeSlot || typeof window === 'undefined') return false;
     
-    const now = new Date();
-    const openTime = new Date(userTimeSlot.openTime);
-    const closeTime = new Date(userTimeSlot.closeTime);
+    const currentUser = getCurrentUser();
+    if (!currentUser) return false;
     
-    return now >= openTime && now <= closeTime;
+    return canUserAccessSeats(
+      new Date(userTimeSlot.baseDate),
+      currentUser.priority || 3,
+      new Date(userTimeSlot.endDate)
+    );
   };
 
   if (!isAuthenticated) {
@@ -144,10 +160,7 @@ export default function Home() {
                         유형
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-sm font-bold text-white uppercase tracking-wider">
-                        신청 시작
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-sm font-bold text-white uppercase tracking-wider">
-                        신청 마감
+                        신청 가능 시간
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-sm font-bold text-white uppercase tracking-wider">
                         배정 기간
@@ -164,34 +177,50 @@ export default function Home() {
                       const currentUser = getCurrentUser();
                       const userPriority = currentUser ? currentUser.priority : 3;
                       
-                      // 해당 사용자의 우선순위에 맞는 시간 계산
-                      const userOpenTime = slot.priorityTimes && 
-                                         slot.priorityTimes[userPriority] ? 
-                                         slot.priorityTimes[userPriority].openTime : null;
-                                         
-                      const userCloseTime = slot.priorityTimes && 
-                                          slot.priorityTimes[userPriority] ? 
-                                          slot.priorityTimes[userPriority].closeTime : null;
+                      // 해당 사용자의 접근 가능 시간 구간들 계산
+                      const accessTimeSlots = getUserAccessTimeSlots(
+                        new Date(slot.baseDate),
+                        userPriority,
+                        new Date(slot.endDate)
+                      );
                       
                       const now = new Date();
-                      const openTime = userOpenTime ? new Date(userOpenTime) : null;
-                      const closeTime = userCloseTime ? new Date(userCloseTime) : null;
-                      
                       let status = '';
                       let statusClass = '';
+                      let accessTimeText = '';
                       
-                      if (!openTime || !closeTime) {
+                      if (accessTimeSlots.length === 0) {
                         status = '준비 중';
                         statusClass = 'text-gray-500';
-                      } else if (now < openTime) {
-                        status = '대기 중';
-                        statusClass = 'text-gray-500';
-                      } else if (now >= openTime && now <= closeTime) {
-                        status = '신청 가능';
-                        statusClass = 'text-green-600 font-bold';
+                        accessTimeText = '시간 미정';
                       } else {
-                        status = '마감됨';
-                        statusClass = 'text-red-500';
+                        // 현재 접근 가능한지 확인
+                        const canAccess = accessTimeSlots.some(slot => 
+                          now >= slot.start && now <= slot.end
+                        );
+                        
+                        if (canAccess) {
+                          status = '신청 가능';
+                          statusClass = 'text-green-600 font-bold';
+                        } else {
+                          // 다음 접근 시간 확인
+                          const nextSlot = accessTimeSlots.find(slot => now < slot.start);
+                          if (nextSlot) {
+                            status = '대기 중';
+                            statusClass = 'text-gray-500';
+                          } else {
+                            status = '마감됨';
+                            statusClass = 'text-red-500';
+                          }
+                        }
+                        
+                        // 접근 가능 시간 텍스트 생성
+                        accessTimeText = accessTimeSlots.map(slot => {
+                          const startTime = formatDateTime(slot.start);
+                          const endTime = formatDateTime(slot.end);
+                          const typeLabel = slot.type === 'own' ? '자신의 시간' : '15:00 이후';
+                          return `${startTime}~${endTime} (${typeLabel})`;
+                        }).join(', ');
                       }
                       
                       return (
@@ -204,11 +233,10 @@ export default function Home() {
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{formatDateTime(userOpenTime)}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{formatDateTime(userCloseTime)}</div>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900 max-w-md">
+                              {accessTimeText}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
@@ -226,15 +254,13 @@ export default function Home() {
               </div>
               
               <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-200 text-sm text-gray-600">
-                <p className="font-bold mb-1">신청 가능 시간:</p>
-                <ul className="list-disc pl-5 grid grid-cols-1 md:grid-cols-2 gap-1">
-                  {Object.keys(timeUtils.PRIORITY_LABELS).map(priority => (
-                    <li key={`priority-info-${priority}`}>
-                      <strong>{timeUtils.PRIORITY_LABELS[priority]} ({priority}유형):</strong> {formatTime(calculateStartTimeByPriority(new Date(), priority))}
-                    </li>
-                  ))}
+                <p className="font-bold mb-1">신청 규칙:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li><strong>1순위(수료생) & 12순위(기타):</strong> 15:00부터 배정 일정 종료까지 신청 가능</li>
+                  <li><strong>2~11순위:</strong> 자신의 배정시간(30분) + 15:00 이후 신청 가능</li>
+                  <li><strong>관리자:</strong> 언제든지 신청 가능</li>
                 </ul>
-                <p className="mt-2 text-xs text-red-500">* 각 시간은 30분간 신청 가능하며, 해당 시간에 신청하지 못한 경우 오후 3시 이후 신청 가능합니다.</p>
+                <p className="mt-2 text-xs text-red-500">* 각 우선순위별 배정시간은 30분간이며, 15:00 이후에는 모든 우선순위가 추가 신청 가능합니다.</p>
               </div>
             </Suspense>
           ) : (
