@@ -87,8 +87,8 @@ export const getTimeSlots = async () => {
   // 서버 Wake-up 확인
   await ensureServerAwake();
   
-  const response = await api.get('/timeslots');
-  return response.data;
+    const response = await api.get('/timeslots');
+    return response.data;
 };
 
 // Admin API calls

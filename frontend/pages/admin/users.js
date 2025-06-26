@@ -380,22 +380,22 @@ export default function AdminUsers() {
                   className="hidden"
                 />
               </label>
-              
-              <button 
-                onClick={() => {
-                  setNewUserData({
-                    studentId: '',
-                    name: '',
-                    priority: 3,
-                    isAdmin: false
-                  });
-                  setShowAddModal(true);
-                }}
-                className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center"
-              >
-                <FaPlus className="mr-2" /> 사용자 추가
-              </button>
-            </div>
+            
+            <button 
+              onClick={() => {
+                setNewUserData({
+                  studentId: '',
+                  name: '',
+                  priority: 3,
+                  isAdmin: false
+                });
+                setShowAddModal(true);
+              }}
+              className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center"
+            >
+              <FaPlus className="mr-2" /> 사용자 추가
+            </button>
+          </div>
           </div>
           
           {loading ? (
@@ -436,12 +436,12 @@ export default function AdminUsers() {
                 >
                   <FaDownload className="mr-2" /> CSV 템플릿 다운로드
                 </button>
-                <button 
-                  onClick={() => setShowAddModal(true)}
-                  className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                >
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              >
                   개별 사용자 추가
-                </button>
+              </button>
               </div>
             </div>
           ) : (
@@ -472,7 +472,7 @@ export default function AdminUsers() {
                 </div>
               )}
 
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                   <h3 className="text-lg font-medium text-gray-900">
                     사용자 목록 ({users.length}명)
@@ -493,10 +493,10 @@ export default function AdminUsers() {
                   </div>
                 </div>
                 
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           <button
                             onClick={handleSelectAll}
@@ -508,16 +508,16 @@ export default function AdminUsers() {
                             }
                           </button>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">학번/수험번호</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">생년월일</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">학번/수험번호</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">생년월일</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">우선순위</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">권한</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {users.map((user) => (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">권한</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {users.map((user) => (
                         <tr key={user._id} className={`hover:bg-gray-50 ${selectedUsers.includes(user.studentId) ? 'bg-blue-50' : ''}`}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {!user.isAdmin && (
@@ -532,48 +532,48 @@ export default function AdminUsers() {
                               </button>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.studentId}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.birthdate}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.studentId}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.birthdate}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                               {user.priority}순위
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.isAdmin ? 
+                            <span className="flex items-center text-blue-600">
+                              <FaUserShield className="mr-1" /> 관리자
+                            </span> : 
+                            <span className="flex items-center text-gray-600">
+                              <FaUser className="mr-1" /> 일반 사용자
                             </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {user.isAdmin ? 
-                              <span className="flex items-center text-blue-600">
-                                <FaUserShield className="mr-1" /> 관리자
-                              </span> : 
-                              <span className="flex items-center text-gray-600">
-                                <FaUser className="mr-1" /> 일반 사용자
-                              </span>
-                            }
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <button 
-                                onClick={() => handleEditUser(user)}
-                                className="text-indigo-600 hover:text-indigo-900" 
-                                title="수정"
-                              >
-                                <FaEdit />
-                              </button>
+                          }
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button 
+                              onClick={() => handleEditUser(user)}
+                              className="text-indigo-600 hover:text-indigo-900" 
+                              title="수정"
+                            >
+                              <FaEdit />
+                            </button>
                               {!user.isAdmin && (
-                                <button 
-                                  onClick={() => handleDeleteClick(user)}
-                                  className="text-red-600 hover:text-red-900" 
-                                  title="삭제"
-                                >
-                                  <FaTrash />
-                                </button>
+                            <button 
+                              onClick={() => handleDeleteClick(user)}
+                              className="text-red-600 hover:text-red-900" 
+                              title="삭제"
+                            >
+                              <FaTrash />
+                            </button>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
                 </div>
               </div>
             </div>

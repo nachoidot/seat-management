@@ -19,7 +19,7 @@ exports.getUsers = async (req, res) => {
   try {
     // admin 계정 제외하고 조회
     const users = await User.find({ studentId: { $ne: 'admin' } }).sort({ createdAt: -1 });
-    
+
     res.status(200).json({
       success: true,
       count: users.length,

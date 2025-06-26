@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import '../styles/globals.css';
 import { useSessionTimeout, isAuthenticated } from '../utils/auth';
 import { autoWakeUpOnLoad, startKeepAlive } from '../utils/wakeup';
@@ -43,6 +44,7 @@ const ClientOnlyApp = ({ Component, pageProps }) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
       <Component {...pageProps} />
+      <SpeedInsights />
     </>
   );
 };

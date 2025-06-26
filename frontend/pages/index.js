@@ -199,15 +199,15 @@ export default function Home() {
                             priority,
                             new Date(displaySlot.endDate)
                           );
-                          
-                          const now = new Date();
-                          let status = '';
-                          let statusClass = '';
+                      
+                      const now = new Date();
+                      let status = '';
+                      let statusClass = '';
                           let accessTimeText = '';
-                          
+                      
                           if (accessTimeSlots.length === 0) {
-                            status = '준비 중';
-                            statusClass = 'text-gray-500';
+                        status = '준비 중';
+                        statusClass = 'text-gray-500';
                             accessTimeText = '시간 미정';
                           } else {
                             // 현재 접근 가능한지 확인
@@ -222,7 +222,7 @@ export default function Home() {
                               // 다음 접근 시간 확인
                               const nextSlot = accessTimeSlots.find(slot => now < slot.start);
                               if (nextSlot) {
-                                status = '대기 중';
+                        status = '대기 중';
                                 statusClass = 'text-orange-500';
                               } else {
                                 status = '마감됨';
@@ -287,7 +287,7 @@ export default function Home() {
                         
                         if (accessTimeSlots.length === 0) {
                           status = '준비 중';
-                          statusClass = 'text-gray-500';
+                        statusClass = 'text-gray-500';
                           accessTimeText = '시간 미정';
                         } else {
                           // 현재 접근 가능한지 확인
@@ -296,17 +296,17 @@ export default function Home() {
                           );
                           
                           if (canAccess) {
-                            status = '신청 가능';
-                            statusClass = 'text-green-600 font-bold';
+                        status = '신청 가능';
+                        statusClass = 'text-green-600 font-bold';
                           } else {
                             // 다음 접근 시간 확인
                             const nextSlot = accessTimeSlots.find(slot => now < slot.start);
                             if (nextSlot) {
                               status = '대기 중';
                               statusClass = 'text-orange-500';
-                            } else {
-                              status = '마감됨';
-                              statusClass = 'text-red-500';
+                      } else {
+                        status = '마감됨';
+                        statusClass = 'text-red-500';
                             }
                           }
                           
@@ -317,33 +317,33 @@ export default function Home() {
                             const typeLabel = slot.type === 'own' ? '자신의 시간' : '15:00 이후';
                             return `${startTime}~${endTime} (${typeLabel})`;
                           }).join(', ');
-                        }
-                        
-                        return (
+                      }
+                      
+                      return (
                           <tr key={`user-priority-${userPriority}`} className="bg-blue-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
-                                {getPriorityLabel(userPriority)}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {getPriorityLabel(userPriority)}
                                 <span className="ml-2 text-xs bg-blue-600 text-white px-3 py-1 rounded-full font-bold">
-                                  내 유형
-                                </span>
-                              </div>
-                            </td>
+                                내 유형
+                              </span>
+                            </div>
+                          </td>
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-900 max-w-md">
                                 {accessTimeText}
                               </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
                                 {formatDateForDisplay(displaySlot.baseDate)} ~ {formatDateForDisplay(displaySlot.endDate)}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className={`text-sm ${statusClass}`}>{status}</div>
-                            </td>
-                          </tr>
-                        );
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className={`text-sm ${statusClass}`}>{status}</div>
+                          </td>
+                        </tr>
+                      );
                       }
                     })() : null}
                   </tbody>

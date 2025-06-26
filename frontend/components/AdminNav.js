@@ -13,7 +13,7 @@ export default function AdminNav() {
     
     // 확인 다이얼로그
     if (confirm('정말 로그아웃 하시겠습니까?')) {
-      logout();
+    logout();
     }
   };
 
