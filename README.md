@@ -22,7 +22,11 @@
 ## 🚀 배포
 
 - 프론트엔드: **Vercel**
+<<<<<<< HEAD
 - 백엔드: **CloudType**
+=======
+- 백엔드: **cloudtype**
+>>>>>>> c924836ee706299e9fe545d25c0335fd0cda58c7
 - 데이터베이스: **MongoDB Atlas**
 
 ## 🏗 프로젝트 구조
