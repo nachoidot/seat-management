@@ -85,6 +85,21 @@ mongoose.connect(mongoUri)
         });
         console.log('테스트 사용자 추가 성공:', testUser);
       }
+      // 테스트 사용자 추가
+      const existingTest2 = await User.findOne({ studentId: '120230525' });
+      if (existingTest) {
+        console.log('이미 test123 사용자가 존재합니다:', existingTest);
+      } else {
+        const testUser = await User.create({
+          studentId: '120230525',
+          name: '박대민',
+          birthdate: '19941004',
+          priority: 1,
+          isAdmin: false
+        });
+        console.log('테스트 사용자 추가 성공:', testUser);
+      }
+      
 
       // 전체 사용자 조회
       const allUsers = await User.find();
