@@ -52,8 +52,11 @@ export default function Home() {
       // Fetch time slots
       const timeSlotsResponse = await getTimeSlots();
       
+      // API 응답 구조 확인 및 데이터 추출
+      const timeSlotData = timeSlotsResponse.success ? timeSlotsResponse.data : [];
+      
       // 모든 시간 슬롯에 우선순위별 시간 정보 추가
-      const enhancedTimeSlots = (timeSlotsResponse.data.data || []).map(slot => {
+      const enhancedTimeSlots = (timeSlotData || []).map(slot => {
         // 각 우선순위별 시간 계산
         const priorityTimes = {};
         for (let priority = 1; priority <= 12; priority++) {
@@ -171,84 +174,178 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {timeSlots.map((slot) => {
-                      if (!slot) return null;
+                    {timeSlots.length > 0 ? (() => {
+                      // 가장 최근 활성화된 일정 찾기
+                      const activeSlots = timeSlots.filter(slot => slot && slot.active);
+                      const displaySlot = activeSlots.length > 0 
+                        ? activeSlots.reduce((latest, current) => {
+                            return new Date(current.baseDate) > new Date(latest.baseDate) ? current : latest;
+                          }, activeSlots[0])
+                        : timeSlots[0]; // 활성화된 슬롯이 없으면 첫 번째 슬롯 표시
+                      
+                      if (!displaySlot) return null;
                       
                       const currentUser = getCurrentUser();
-                      const userPriority = currentUser ? currentUser.priority : 3;
+                      const isAdmin = currentUser && currentUser.isAdmin;
                       
-                      // 해당 사용자의 접근 가능 시간 구간들 계산
-                      const accessTimeSlots = getUserAccessTimeSlots(
-                        new Date(slot.baseDate),
-                        userPriority,
-                        new Date(slot.endDate)
-                      );
-                      
-                      const now = new Date();
-                      let status = '';
-                      let statusClass = '';
-                      let accessTimeText = '';
-                      
-                      if (accessTimeSlots.length === 0) {
-                        status = '준비 중';
-                        statusClass = 'text-gray-500';
-                        accessTimeText = '시간 미정';
+                      if (isAdmin) {
+                        // 관리자: 모든 우선순위 표시 (1~12)
+                        return Array.from({ length: 12 }, (_, index) => {
+                          const priority = index + 1;
+                          
+                          // 해당 우선순위의 접근 가능 시간 구간들 계산
+                          const accessTimeSlots = getUserAccessTimeSlots(
+                            new Date(displaySlot.baseDate),
+                            priority,
+                            new Date(displaySlot.endDate)
+                          );
+                          
+                          const now = new Date();
+                          let status = '';
+                          let statusClass = '';
+                          let accessTimeText = '';
+                          
+                          if (accessTimeSlots.length === 0) {
+                            status = '준비 중';
+                            statusClass = 'text-gray-500';
+                            accessTimeText = '시간 미정';
+                          } else {
+                            // 현재 접근 가능한지 확인
+                            const canAccess = accessTimeSlots.some(slot => 
+                              now >= slot.start && now <= slot.end
+                            );
+                            
+                            if (canAccess) {
+                              status = '신청 가능';
+                              statusClass = 'text-green-600 font-bold';
+                            } else {
+                              // 다음 접근 시간 확인
+                              const nextSlot = accessTimeSlots.find(slot => now < slot.start);
+                              if (nextSlot) {
+                                status = '대기 중';
+                                statusClass = 'text-orange-500';
+                              } else {
+                                status = '마감됨';
+                                statusClass = 'text-red-500';
+                              }
+                            }
+                            
+                            // 접근 가능 시간 텍스트 생성
+                            accessTimeText = accessTimeSlots.map(slot => {
+                              const startTime = formatDateTime(slot.start);
+                              const endTime = formatDateTime(slot.end);
+                              const typeLabel = slot.type === 'own' ? '자신의 시간' : '15:00 이후';
+                              return `${startTime}~${endTime} (${typeLabel})`;
+                            }).join(', ');
+                          }
+                          
+                          const isCurrentUserPriority = currentUser.priority === priority;
+                          
+                          return (
+                            <tr key={`priority-${priority}`} className={isCurrentUserPriority ? 'bg-blue-50' : ''}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {getPriorityLabel(priority)}
+                                  {isCurrentUserPriority && (
+                                    <span className="ml-2 text-xs bg-blue-600 text-white px-3 py-1 rounded-full font-bold">
+                                      내 유형
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm text-gray-900 max-w-md">
+                                  {accessTimeText}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {formatDateForDisplay(displaySlot.baseDate)} ~ {formatDateForDisplay(displaySlot.endDate)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className={`text-sm ${statusClass}`}>{status}</div>
+                              </td>
+                            </tr>
+                          );
+                        });
                       } else {
-                        // 현재 접근 가능한지 확인
-                        const canAccess = accessTimeSlots.some(slot => 
-                          now >= slot.start && now <= slot.end
+                        // 일반 사용자: 자신의 우선순위만 표시
+                        const userPriority = currentUser ? currentUser.priority : 3;
+                        
+                        // 해당 사용자의 접근 가능 시간 구간들 계산
+                        const accessTimeSlots = getUserAccessTimeSlots(
+                          new Date(displaySlot.baseDate),
+                          userPriority,
+                          new Date(displaySlot.endDate)
                         );
                         
-                        if (canAccess) {
-                          status = '신청 가능';
-                          statusClass = 'text-green-600 font-bold';
+                        const now = new Date();
+                        let status = '';
+                        let statusClass = '';
+                        let accessTimeText = '';
+                        
+                        if (accessTimeSlots.length === 0) {
+                          status = '준비 중';
+                          statusClass = 'text-gray-500';
+                          accessTimeText = '시간 미정';
                         } else {
-                          // 다음 접근 시간 확인
-                          const nextSlot = accessTimeSlots.find(slot => now < slot.start);
-                          if (nextSlot) {
-                            status = '대기 중';
-                            statusClass = 'text-gray-500';
+                          // 현재 접근 가능한지 확인
+                          const canAccess = accessTimeSlots.some(slot => 
+                            now >= slot.start && now <= slot.end
+                          );
+                          
+                          if (canAccess) {
+                            status = '신청 가능';
+                            statusClass = 'text-green-600 font-bold';
                           } else {
-                            status = '마감됨';
-                            statusClass = 'text-red-500';
+                            // 다음 접근 시간 확인
+                            const nextSlot = accessTimeSlots.find(slot => now < slot.start);
+                            if (nextSlot) {
+                              status = '대기 중';
+                              statusClass = 'text-orange-500';
+                            } else {
+                              status = '마감됨';
+                              statusClass = 'text-red-500';
+                            }
                           }
+                          
+                          // 접근 가능 시간 텍스트 생성
+                          accessTimeText = accessTimeSlots.map(slot => {
+                            const startTime = formatDateTime(slot.start);
+                            const endTime = formatDateTime(slot.end);
+                            const typeLabel = slot.type === 'own' ? '자신의 시간' : '15:00 이후';
+                            return `${startTime}~${endTime} (${typeLabel})`;
+                          }).join(', ');
                         }
                         
-                        // 접근 가능 시간 텍스트 생성
-                        accessTimeText = accessTimeSlots.map(slot => {
-                          const startTime = formatDateTime(slot.start);
-                          const endTime = formatDateTime(slot.end);
-                          const typeLabel = slot.type === 'own' ? '자신의 시간' : '15:00 이후';
-                          return `${startTime}~${endTime} (${typeLabel})`;
-                        }).join(', ');
+                        return (
+                          <tr key={`user-priority-${userPriority}`} className="bg-blue-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {getPriorityLabel(userPriority)}
+                                <span className="ml-2 text-xs bg-blue-600 text-white px-3 py-1 rounded-full font-bold">
+                                  내 유형
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900 max-w-md">
+                                {accessTimeText}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {formatDateForDisplay(displaySlot.baseDate)} ~ {formatDateForDisplay(displaySlot.endDate)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className={`text-sm ${statusClass}`}>{status}</div>
+                            </td>
+                          </tr>
+                        );
                       }
-                      
-                      return (
-                        <tr key={slot._id || `slot-${userPriority}`} className={userPriority === parseInt(userPriority) ? 'bg-gray-light' : ''}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {getPriorityLabel(userPriority)}
-                              <span className="ml-2 text-xs bg-white text-cardinal px-3 py-1 rounded-full font-bold border-2 border-cardinal">
-                                내 유형
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900 max-w-md">
-                              {accessTimeText}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {formatDateForDisplay(slot.baseDate)} ~ {formatDateForDisplay(slot.endDate)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`text-sm ${statusClass}`}>{status}</div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    })() : null}
                   </tbody>
                 </table>
               </div>

@@ -79,31 +79,8 @@ export const getSeatAssignmentStats = async () => {
 
 // TimeSlots API calls
 export const getTimeSlots = async () => {
-  try {
-    console.log('API 호출: getTimeSlots');
-    const response = await api.get('/timeslots');
-    console.log('API 원본 응답:', response);
-    
-    // API 응답 형식 유효성 검사
-    if (!response || !response.data) {
-      console.error('API 응답이 비어있음:', response);
-      throw new Error('API 응답이 비어있습니다.');
-    }
-    
-    console.log('API 응답 데이터 구조:', {
-      isArray: Array.isArray(response.data),
-      hasData: !!response.data.data,
-      hasSuccess: 'success' in response.data,
-      dataType: typeof response.data
-    });
-    
-    // 직접 응답 객체 반환 (가공하지 않음)
-    return response.data;
-  } catch (error) {
-    console.error('일정 데이터 조회 오류:', error);
-    // 에러를 던져서 호출자가 처리하도록 함
-    throw error;
-  }
+  const response = await api.get('/timeslots');
+  return response.data;
 };
 
 // Admin API calls
