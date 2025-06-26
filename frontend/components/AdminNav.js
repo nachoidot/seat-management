@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FaHome, FaChair, FaCalendarAlt, FaUsers, FaSignOutAlt, FaTachometerAlt, FaBars, FaTimes } from 'react-icons/fa';
+import { FaHome, FaChair, FaCalendarAlt, FaUsers, FaSignOutAlt, FaTachometerAlt, FaBars, FaTimes, FaInfoCircle } from 'react-icons/fa';
 import { logout } from '../utils/auth';
 
 export default function AdminNav() {
@@ -70,6 +70,11 @@ export default function AdminNav() {
             <li>
               <Link href="/admin/users" className={`flex items-center px-5 py-3 hover:bg-secondary ${isActive('/admin/users')}`}>
                 <FaUsers className="mr-3" /> 사용자 관리
+              </Link>
+            </li>
+            <li>
+              <Link href="/admin/info" className={`flex items-center px-5 py-3 hover:bg-secondary ${isActive('/admin/info')}`}>
+                <FaInfoCircle className="mr-3" /> 관리자 정보
               </Link>
             </li>
             <li>

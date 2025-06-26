@@ -187,4 +187,16 @@ export const adminAssignSeat = async (number, section, studentId) => {
   return response.data;
 };
 
+// 관리자 정보 조회
+export const getAdminInfo = async () => {
+  const response = await api.get('/admin/info');
+  return response.data;
+};
+
+// 관리자 정보 업데이트
+export const updateAdminInfo = async (adminInfo) => {
+  const response = await api.put('/admin/info', adminInfo);
+  return response.data;
+};
+
 export default api; 

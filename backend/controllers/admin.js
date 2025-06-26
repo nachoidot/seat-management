@@ -1,23 +1,36 @@
 const Seat = require('../models/Seat');
 const User = require('../models/User');
+const AdminInfo = require('../models/AdminInfo');
 const XLSX = require('xlsx');
+
+// 관리자 정보 (환경변수나 설정 파일 대신 직접 관리)
+let adminInfo = {
+  name: process.env.ADMIN_NAME || '관리자',
+  phone: process.env.ADMIN_PHONE || '02-0000-0000', 
+  email: process.env.ADMIN_EMAIL || 'admin@sogang.ac.kr',
+  department: process.env.ADMIN_DEPARTMENT || '경제학과',
+  position: process.env.ADMIN_POSITION || '주임조교'
+};
 
 // @desc    Get all users
 // @route   GET /api/admin/users
 // @access  Private (Admin only)
 exports.getUsers = async (req, res) => {
   try {
-    const users = await User.find().sort({ studentId: 1 });
-
+    // admin 계정 제외하고 조회
+    const users = await User.find({ studentId: { $ne: 'admin' } }).sort({ createdAt: -1 });
+    
     res.status(200).json({
       success: true,
       count: users.length,
       data: users
     });
   } catch (err) {
+    console.error('Error fetching users:', err);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Server error',
+      error: err.message
     });
   }
 };
@@ -94,6 +107,14 @@ exports.createUser = async (req, res) => {
 // @access  Private (Admin only)
 exports.updateUser = async (req, res) => {
   try {
+    // admin 계정 수정 방지
+    if (req.params.id === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account cannot be modified'
+      });
+    }
+
     let user = await User.findOne({ studentId: req.params.id });
 
     if (!user) {
@@ -134,12 +155,28 @@ exports.updateUser = async (req, res) => {
 // @access  Private (Admin only)
 exports.deleteUser = async (req, res) => {
   try {
+    // admin 계정 삭제 방지
+    if (req.params.id === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account cannot be deleted'
+      });
+    }
+
     const user = await User.findOne({ studentId: req.params.id });
 
     if (!user) {
       return res.status(404).json({
         success: false,
         message: `User not found with student ID of ${req.params.id}`
+      });
+    }
+
+    // 관리자 계정 삭제 방지 (추가 보안)
+    if (user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot delete admin users'
       });
     }
 
@@ -536,13 +573,17 @@ exports.bulkDeleteUsers = async (req, res) => {
     let filter = {};
     
     if (deleteAll) {
-      // 모든 사용자 삭제 (관리자 제외)
-      filter = { isAdmin: { $ne: true } };
+      // 모든 사용자 삭제 (관리자와 admin 계정 제외)
+      filter = { 
+        isAdmin: { $ne: true },
+        studentId: { $ne: 'admin' }
+      };
     } else if (userIds && userIds.length > 0) {
-      // 특정 사용자들 삭제
+      // 특정 사용자들 삭제 (관리자와 admin 계정 제외)
       filter = { 
         studentId: { $in: userIds },
-        isAdmin: { $ne: true } // 관리자는 삭제 불가
+        isAdmin: { $ne: true },
+        studentId: { $ne: 'admin' }
       };
     } else {
       return res.status(400).json({
@@ -579,6 +620,62 @@ exports.bulkDeleteUsers = async (req, res) => {
       success: false,
       message: 'Server error',
       error: error.message
+    });
+  }
+};
+
+// @desc    Get admin info
+// @route   GET /api/admin/info
+// @access  Public (for login page)
+exports.getAdminInfo = async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: adminInfo
+    });
+  } catch (err) {
+    console.error('Error fetching admin info:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// @desc    Update admin info
+// @route   PUT /api/admin/info
+// @access  Private (Admin only)
+exports.updateAdminInfo = async (req, res) => {
+  try {
+    const { name, phone, email, department, position } = req.body;
+    
+    // 필수 필드 검증
+    if (!name || !phone || !email) {
+      return res.status(400).json({
+        success: false,
+        message: '이름, 전화번호, 이메일은 필수 입력 항목입니다.'
+      });
+    }
+    
+    // 메모리의 관리자 정보 업데이트
+    adminInfo = {
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      department: (department || '경제학과').trim(),
+      position: (position || '주임조교').trim()
+    };
+    
+    res.status(200).json({
+      success: true,
+      message: '관리자 정보가 성공적으로 업데이트되었습니다.',
+      data: adminInfo
+    });
+  } catch (err) {
+    console.error('Error updating admin info:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 }; 

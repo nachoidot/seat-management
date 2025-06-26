@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
-import { login } from '../utils/api';
+import { login, getAdminInfo } from '../utils/api';
 import { setAuth, isAuthenticated } from '../utils/auth';
 import { toast } from 'react-toastify';
 
@@ -11,6 +11,7 @@ export default function Login() {
     name: ''
   });
   const [loading, setLoading] = useState(false);
+  const [adminInfo, setAdminInfo] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -18,7 +19,22 @@ export default function Login() {
     if (isAuthenticated()) {
       router.push('/');
     }
+
+    // 관리자 정보 로드
+    loadAdminInfo();
   }, []);
+
+  const loadAdminInfo = async () => {
+    try {
+      const response = await getAdminInfo();
+      if (response.success) {
+        setAdminInfo(response.data);
+      }
+    } catch (error) {
+      console.error('관리자 정보 로드 실패:', error);
+      // 에러가 발생해도 로그인 페이지는 정상 표시
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -117,7 +133,14 @@ export default function Login() {
             </form>
             
             <div className="text-center mt-6 text-sm text-gray-600">
-              <p>로그인에 문제가 있으시면 관리자에게 문의하세요.</p>
+              <p className="mb-2">로그인에 문제가 있으시면 관리자에게 문의하세요.</p>
+              {adminInfo && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="font-medium text-gray-800">
+                    {adminInfo.department} {adminInfo.position} {adminInfo.name} : {adminInfo.phone} ({adminInfo.email})
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

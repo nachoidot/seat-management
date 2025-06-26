@@ -90,8 +90,9 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
       const response = await getUsers();
       const users = response.data || [];
       
-      // 사용자 정보에 현재 배정된 좌석 정보 추가
-      const usersWithSeatInfo = users.map(user => {
+      // admin 계정 제외하고 사용자 정보에 현재 배정된 좌석 정보 추가
+      const filteredUsers = users.filter(user => user.studentId !== 'admin');
+      const usersWithSeatInfo = filteredUsers.map(user => {
         const assignedSeat = seats.find(seat => seat.assignedTo === user.studentId);
         return {
           ...user,
