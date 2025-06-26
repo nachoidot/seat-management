@@ -357,4 +357,117 @@ exports.bulkCreateUsers = async (req, res) => {
       message: 'Server error'
     });
   }
+};
+
+// @desc    Bulk confirm seat assignments
+// @route   POST /api/admin/seats/bulk-confirm
+// @access  Private (Admin only)
+exports.bulkConfirmSeats = async (req, res) => {
+  try {
+    const { seatIds, roomNumbers, confirmAll } = req.body;
+    
+    let filter = {};
+    
+    if (confirmAll) {
+      // 모든 배정된 좌석을 확정
+      filter = { assignedTo: { $ne: null }, confirmed: false };
+    } else if (roomNumbers && roomNumbers.length > 0) {
+      // 특정 방의 배정된 좌석들을 확정
+      filter = { 
+        roomNumber: { $in: roomNumbers }, 
+        assignedTo: { $ne: null }, 
+        confirmed: false 
+      };
+    } else if (seatIds && seatIds.length > 0) {
+      // 특정 좌석들을 확정
+      filter = { 
+        _id: { $in: seatIds }, 
+        assignedTo: { $ne: null }, 
+        confirmed: false 
+      };
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide seatIds, roomNumbers, or set confirmAll to true'
+      });
+    }
+
+    const result = await Seat.updateMany(
+      filter,
+      { 
+        confirmed: true, 
+        updatedAt: Date.now() 
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `${result.modifiedCount}개의 좌석이 확정되었습니다.`,
+      data: {
+        modifiedCount: result.modifiedCount
+      }
+    });
+  } catch (error) {
+    console.error('Error bulk confirming seats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get seat assignment statistics
+// @route   GET /api/admin/seats/assignment-stats
+// @access  Private (Admin only)
+exports.getSeatAssignmentStats = async (req, res) => {
+  try {
+    const totalSeats = await Seat.countDocuments({ active: true });
+    const assignedSeats = await Seat.countDocuments({ assignedTo: { $ne: null }, active: true });
+    const confirmedSeats = await Seat.countDocuments({ confirmed: true, active: true });
+    const pendingSeats = assignedSeats - confirmedSeats;
+
+    // 방별 통계
+    const roomStats = await Seat.aggregate([
+      { $match: { active: true } },
+      {
+        $group: {
+          _id: '$roomNumber',
+          total: { $sum: 1 },
+          assigned: {
+            $sum: {
+              $cond: [{ $ne: ['$assignedTo', null] }, 1, 0]
+            }
+          },
+          confirmed: {
+            $sum: {
+              $cond: ['$confirmed', 1, 0]
+            }
+          }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total: totalSeats,
+        assigned: assignedSeats,
+        confirmed: confirmedSeats,
+        pending: pendingSeats,
+        available: totalSeats - assignedSeats,
+        assignmentRate: totalSeats > 0 ? Math.round((assignedSeats / totalSeats) * 100) : 0,
+        confirmationRate: assignedSeats > 0 ? Math.round((confirmedSeats / assignedSeats) * 100) : 0,
+        roomStats: roomStats
+      }
+    });
+  } catch (error) {
+    console.error('Error getting seat assignment stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
 }; 

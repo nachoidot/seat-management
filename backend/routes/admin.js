@@ -1,13 +1,12 @@
 const express = require('express');
 const { 
   getUsers, 
-  createUser, 
-  updateUser, 
-  deleteUser, 
-  resetSeats, 
-  exportSeats, 
-  createBatchSeats,
-  bulkCreateUsers
+  getSeats, 
+  resetAllSeats, 
+  exportSeats,
+  bulkCreateUsers,
+  bulkConfirmSeats,
+  getSeatAssignmentStats
 } = require('../controllers/admin');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -19,14 +18,13 @@ router.use(authorize(true));
 
 // User management routes
 router.get('/users', getUsers);
-router.post('/users', createUser);
 router.post('/users/bulk', bulkCreateUsers);
-router.put('/users/:id', updateUser);
-router.delete('/users/:id', deleteUser);
 
 // Seat management routes
-router.put('/seats/reset', resetSeats);
+router.get('/seats', getSeats);
+router.post('/seats/reset', resetAllSeats);
 router.get('/seats/export', exportSeats);
-router.post('/seats/batch', createBatchSeats);
+router.post('/seats/bulk-confirm', bulkConfirmSeats);
+router.get('/seats/assignment-stats', getSeatAssignmentStats);
 
 module.exports = router; 

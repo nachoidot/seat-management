@@ -61,6 +61,18 @@ export const confirmSeat = async (number, section) => {
   return response.data;
 };
 
+// 좌석 일괄 확정
+export const bulkConfirmSeats = async (options = {}) => {
+  const response = await api.post('/admin/seats/bulk-confirm', options);
+  return response.data;
+};
+
+// 좌석 배정 통계 조회
+export const getSeatAssignmentStats = async () => {
+  const response = await api.get('/admin/seats/assignment-stats');
+  return response.data;
+};
+
 // TimeSlots API calls
 export const getTimeSlots = async () => {
   try {
