@@ -128,21 +128,46 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
-// @desc    Reset all seat assignments
-// @route   PUT /api/admin/seats/reset
+// @desc    Get all seats
+// @route   GET /api/admin/seats
 // @access  Private (Admin only)
-exports.resetSeats = async (req, res) => {
+exports.getSeats = async (req, res) => {
   try {
-    await Seat.updateMany(
+    const seats = await Seat.find().sort({ roomNumber: 1, number: 1 });
+
+    res.status(200).json({
+      success: true,
+      count: seats.length,
+      data: seats
+    });
+  } catch (err) {
+    console.error('Error getting seats:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// @desc    Reset all seat assignments
+// @route   POST /api/admin/seats/reset
+// @access  Private (Admin only)
+exports.resetAllSeats = async (req, res) => {
+  try {
+    const result = await Seat.updateMany(
       {},
-      { assignedTo: null, confirmed: false }
+      { assignedTo: null, confirmed: false, updatedAt: Date.now() }
     );
 
     res.status(200).json({
       success: true,
-      message: 'All seat assignments have been reset'
+      message: `모든 좌석 배정이 초기화되었습니다. (${result.modifiedCount}개 좌석)`,
+      data: {
+        modifiedCount: result.modifiedCount
+      }
     });
   } catch (err) {
+    console.error('Error resetting seats:', err);
     res.status(500).json({
       success: false,
       message: 'Server error'

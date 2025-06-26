@@ -12,15 +12,15 @@ const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// All admin routes need authentication and admin role
+// 모든 라우트에 관리자 권한 적용
 router.use(protect);
 router.use(authorize(true));
 
-// User management routes
+// 사용자 관련 라우트
 router.get('/users', getUsers);
 router.post('/users/bulk', bulkCreateUsers);
 
-// Seat management routes
+// 좌석 관련 라우트  
 router.get('/seats', getSeats);
 router.post('/seats/reset', resetAllSeats);
 router.get('/seats/export', exportSeats);

@@ -197,12 +197,19 @@ export default function AdminSeats() {
   const handleBulkConfirm = async (type, options = {}) => {
     try {
       setIsSubmitting(true);
+      console.log('일괄 확정 시작:', { type, options });
+      
       const response = await bulkConfirmSeats(options);
-      toast.success(response.message);
+      console.log('일괄 확정 응답:', response);
+      
+      toast.success(response.message || '좌석이 확정되었습니다.');
       await loadAllData();
     } catch (error) {
       console.error('일괄 확정 오류:', error);
-      toast.error('일괄 확정 중 오류가 발생했습니다.');
+      console.error('오류 응답:', error.response?.data);
+      
+      const errorMessage = error.response?.data?.message || error.message || '일괄 확정 중 오류가 발생했습니다.';
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
