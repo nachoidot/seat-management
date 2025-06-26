@@ -59,7 +59,7 @@ export default function AdminUsers() {
     try {
       setLoading(true);
       const response = await getUsers();
-      setUsers(response.data.data || []);
+      setUsers(response.data || []);
     } catch (error) {
       console.error('사용자 로드 오류:', error);
       toast.error('사용자 정보를 불러오는 중 오류가 발생했습니다.');
@@ -201,7 +201,7 @@ export default function AdminUsers() {
               <FaPlus className="mr-2" /> 사용자 추가
             </button>
           </div>
-          <pre>{JSON.stringify(users, null, 2)}</pre>
+          
           {loading ? (
             <div className="text-center py-12">
               <p className="text-gray-600">데이터를 불러오는 중...</p>
