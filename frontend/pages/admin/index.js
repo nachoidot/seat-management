@@ -6,7 +6,7 @@ import Layout from '../../components/Layout';
 import { getSeats, getUsers, getTimeSlots, resetSeats } from '../../utils/api';
 import { useAdmin } from '../../utils/auth';
 import { toast } from 'react-toastify';
-import { FaUsers, FaCalendarAlt, FaChair, FaUndo, FaDownload } from 'react-icons/fa';
+import { FaUsers, FaCalendarAlt, FaChair, FaUndo, FaDownload, FaCheckCircle, FaTimesCircle, FaDoorOpen } from 'react-icons/fa';
 import { isAuthenticated, getCurrentUser } from '../../utils/auth';
 
 // AdminNav 컴포넌트를 클라이언트 사이드에서만 렌더링
@@ -19,8 +19,13 @@ export default function AdminDashboard() {
     totalSeats: 0,
     assignedSeats: 0,
     confirmedSeats: 0,
+    availableSeats: 0,
     totalUsers: 0,
-    totalTimeSlots: 0
+    totalTimeSlots: 0,
+    seatsByType: { 석사: 0, 박사: 0 },
+    seatsByRoom: {},
+    assignmentRate: 0,
+    confirmationRate: 0
   });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -113,20 +118,53 @@ export default function AdminDashboard() {
         console.log('Seats count:', seats.length);
         console.log('TimeSlots count:', timeslots.length);
         
-        const assignedSeats = seats.filter(seat => seat.assignedTo);
+        // 실제 좌석만 필터링 (obj- 접두사가 없는 좌석들)
+        const actualSeats = seats.filter(seat => !seat.seatId.includes('obj-'));
+        const assignedSeats = actualSeats.filter(seat => seat.assignedTo);
         const confirmedSeats = assignedSeats.filter(seat => seat.confirmed);
+        const availableSeats = actualSeats.filter(seat => !seat.assignedTo);
+        
+        // 좌석 유형별 통계
+        const seatsByType = { 석사: 0, 박사: 0 };
+        actualSeats.forEach(seat => {
+          if (seat.type === '석사') seatsByType.석사++;
+          else if (seat.type === '박사') seatsByType.박사++;
+        });
+        
+        // 방별 통계
+        const seatsByRoom = {};
+        actualSeats.forEach(seat => {
+          const room = seat.roomNumber;
+          if (!seatsByRoom[room]) {
+            seatsByRoom[room] = { total: 0, assigned: 0, confirmed: 0 };
+          }
+          seatsByRoom[room].total++;
+          if (seat.assignedTo) seatsByRoom[room].assigned++;
+          if (seat.confirmed) seatsByRoom[room].confirmed++;
+        });
+        
+        // 비율 계산
+        const assignmentRate = actualSeats.length > 0 ? Math.round((assignedSeats.length / actualSeats.length) * 100) : 0;
+        const confirmationRate = assignedSeats.length > 0 ? Math.round((confirmedSeats.length / assignedSeats.length) * 100) : 0;
         
         console.log('좌석 통계:');
-        console.log('전체 좌석:', seats.length);
+        console.log('전체 좌석:', actualSeats.length);
         console.log('배정된 좌석:', assignedSeats.length);
         console.log('확정된 좌석:', confirmedSeats.length);
+        console.log('유형별 좌석:', seatsByType);
+        console.log('방별 좌석:', seatsByRoom);
         
         const newStats = {
-          totalSeats: seats.length,
+          totalSeats: actualSeats.length,
           assignedSeats: assignedSeats.length,
           confirmedSeats: confirmedSeats.length,
+          availableSeats: availableSeats.length,
           totalUsers: users.length,
-          totalTimeSlots: timeslots.length
+          totalTimeSlots: timeslots.length,
+          seatsByType,
+          seatsByRoom,
+          assignmentRate,
+          confirmationRate
         };
         
         console.log('최종 통계:', newStats);
@@ -186,6 +224,7 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <>
+              {/* 주요 통계 */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                 <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
                   <div className="flex items-center">
@@ -212,12 +251,12 @@ export default function AdminDashboard() {
                 
                 <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
                   <div className="flex items-center">
-                    <FaChair className="text-yellow-500 text-2xl mr-3" />
+                    <FaCheckCircle className="text-yellow-500 text-2xl mr-3" />
                     <div>
                       <h2 className="text-gray-500 text-sm font-semibold mb-1">배정된 좌석</h2>
                       <p className="text-2xl font-bold">{stats.assignedSeats}</p>
                       <p className="text-xs text-gray-400">
-                        {stats.totalSeats > 0 ? Math.round((stats.assignedSeats / stats.totalSeats) * 100) : 0}%
+                        {stats.assignmentRate}% 배정률
                       </p>
                     </div>
                   </div>
@@ -225,12 +264,12 @@ export default function AdminDashboard() {
                 
                 <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
                   <div className="flex items-center">
-                    <FaChair className="text-red-500 text-2xl mr-3" />
+                    <FaCheckCircle className="text-red-500 text-2xl mr-3" />
                     <div>
                       <h2 className="text-gray-500 text-sm font-semibold mb-1">확정된 좌석</h2>
                       <p className="text-2xl font-bold">{stats.confirmedSeats}</p>
                       <p className="text-xs text-gray-400">
-                        {stats.assignedSeats > 0 ? Math.round((stats.confirmedSeats / stats.assignedSeats) * 100) : 0}%
+                        {stats.confirmationRate}% 확정률
                       </p>
                     </div>
                   </div>
@@ -243,6 +282,57 @@ export default function AdminDashboard() {
                       <h2 className="text-gray-500 text-sm font-semibold mb-1">배정 일정</h2>
                       <p className="text-2xl font-bold">{stats.totalTimeSlots}</p>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 세부 통계 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {/* 좌석 유형별 통계 */}
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">좌석 유형별 현황</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">석사과정 좌석</span>
+                      <span className="font-bold text-blue-600">{stats.seatsByType.석사}개</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">박사과정 좌석</span>
+                      <span className="font-bold text-purple-600">{stats.seatsByType.박사}개</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 가용 좌석 */}
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">좌석 배정 현황</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">사용 가능 좌석</span>
+                      <span className="font-bold text-green-600">{stats.availableSeats}개</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">배정 대기</span>
+                      <span className="font-bold text-orange-600">{stats.assignedSeats - stats.confirmedSeats}개</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 방별 통계 */}
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">방별 배정 현황</h3>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {Object.entries(stats.seatsByRoom).map(([room, data]) => (
+                      <div key={room} className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">{room}호</span>
+                        <span className="font-semibold">
+                          {data.assigned}/{data.total}
+                          <span className="text-xs text-gray-400 ml-1">
+                            ({data.total > 0 ? Math.round((data.assigned/data.total)*100) : 0}%)
+                          </span>
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
