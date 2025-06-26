@@ -51,7 +51,10 @@ export const getCurrentUser = () => {
     return null;
   }
 };
-
+export const logout = () => {
+  localStorage.removeItem('token');
+  window.location.href = '/login';
+};
 // Check if user is admin
 export const isAdmin = () => {
   const user = getCurrentUser();

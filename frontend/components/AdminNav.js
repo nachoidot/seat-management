@@ -76,7 +76,7 @@ export default function AdminNav() {
             </li>
             <li>
               <button 
-                onClick={handleLogout}
+                onClick={logout}
                 className="w-full text-left flex items-center px-5 py-3 hover:bg-secondary"
               >
                 <FaSignOutAlt className="mr-3" /> 로그아웃
