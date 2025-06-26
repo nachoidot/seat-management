@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Spoqa Han Sans Neo';
+  src: url('https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Regular.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Spoqa Han Sans Neo';
+  src: url('https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Bold.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: 'Spoqa Han Sans Neo', -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  background-color: #FFFFFF;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --primary-color: #D32F2F;
+  --primary-dark: #B71C1C;
+  --primary-light: #EF5350;
+  --secondary-color: #1E88E5;
+  --secondary-dark: #1976D2;
+  --highlight-color: #EC4899;
+}
+
+@layer components {
+  /* Seat grid styling */
+  .seat-grid {
+    display: grid;
+    gap: 10px;
+    margin: 20px 0;
+  }
+
+  .seat {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .seat-available {
+    background-color: white;
+    border: 1px solid #F3F4F6;
+    color: #333;
+  }
+
+  .seat-available:hover {
+    background-color: #FAFAFA;
+    border-color: var(--primary-light);
+    transform: scale(1.05);
+    z-index: 10;
+  }
+
+  .seat-assigned {
+    background-color: var(--primary-color);
+    border: 1px solid var(--primary-dark);
+    color: white;
+  }
+
+  .seat-assigned:hover {
+    background-color: var(--primary-light);
+    transform: scale(1.05);
+    z-index: 10;
+  }
+
+  .seat-confirmed {
+    background-color: var(--secondary-color);
+    border: 1px solid var(--secondary-dark);
+    color: white;
+  }
+
+  .seat-confirmed:hover {
+    background-color: var(--secondary-color);
+    filter: brightness(1.1);
+    transform: scale(1.05);
+    z-index: 10;
+  }
+
+  .seat-mine {
+    box-shadow: 0 0 0 3px var(--highlight-color);
+    animation: pulse 2s infinite;
+  }
+
+  .seat-hovered {
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    z-index: 20;
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.7); }
+    50% { box-shadow: 0 0 0 6px rgba(236, 72, 153, 0.4); }
+    100% { box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.7); }
+  }
+
+  .empty-space {
+    width: 50px;
+    height: 50px;
+  }
+
+  /* Object styling */
+  .object {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    border-radius: 4px;
+    cursor: default;
+    font-weight: normal;
+    background-color: transparent;
+  }
+
+  .object-pillar {
+    background-color: #6B7280;
+    border: 2px solid #4B5563;
+  }
+
+  .object-window {
+    background-color: #F3F4F6;
+    border: 2px solid #9CA3AF;
+  }
+
+  .object-ac {
+    background-color: #F3F4F6;
+    border: 2px dashed #6B7280;
+  }
+
+  .object-door {
+    background-color: var(--primary-dark);
+    border: 2px dashed var(--primary-color);
+  }
+
+  .object-label {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+  }
+} 
