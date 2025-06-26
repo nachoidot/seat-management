@@ -177,4 +177,10 @@ export const createBatchSeats = async (seatsData) => {
   return response.data;
 };
 
+// 관리자용 좌석 배정
+export const adminAssignSeat = async (number, section, studentId) => {
+  const response = await api.put(`/seats/${number}/${section}/admin-assign`, { studentId });
+  return response.data;
+};
+
 export default api; 

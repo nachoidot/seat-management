@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { getCurrentUser } from '../utils/auth';
-import { assignSeat, unassignSeat, confirmSeat } from '../utils/api';
+import { assignSeat, unassignSeat, confirmSeat, adminAssignSeat, getUsers } from '../utils/api';
 import { FaColumns, FaFan, FaWindowMaximize, FaDoorOpen, FaMapMarkerAlt } from 'react-icons/fa';
 
 const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) => {
@@ -12,6 +12,12 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
   const [activeRoom, setActiveRoom] = useState(null);
   const [userAssignedSeat, setUserAssignedSeat] = useState(null);
   const [hoveredSeat, setHoveredSeat] = useState(null);
+  
+  // 관리자용 상태들
+  const [showUserSelectModal, setShowUserSelectModal] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [selectedSeatForAssign, setSelectedSeatForAssign] = useState(null);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
 
   useEffect(() => {
     // 클라이언트 사이드에서만 실행
@@ -78,12 +84,71 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
     }
   }, [seats, filterRoom]);
 
+  // 사용자 목록 로드
+  const loadUsers = async () => {
+    try {
+      const response = await getUsers();
+      const users = response.data || [];
+      
+      // 사용자 정보에 현재 배정된 좌석 정보 추가
+      const usersWithSeatInfo = users.map(user => {
+        const assignedSeat = seats.find(seat => seat.assignedTo === user.studentId);
+        return {
+          ...user,
+          currentSeat: assignedSeat ? `${assignedSeat.roomNumber}호 ${assignedSeat.number}번` : null,
+          hasAssignment: !!assignedSeat
+        };
+      });
+      
+      setAvailableUsers(usersWithSeatInfo);
+    } catch (error) {
+      console.error('Error loading users:', error);
+      toast.error('사용자 목록을 불러오는 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleSeatClick = async (seat) => {
     if (loading || typeof window === 'undefined') return;
     
     setSelectedSeat(seat);
     
-    // 관리자가 아니고 현재 사용자가 이미 다른 좌석을 배정받은 경우
+    // 관리자 모드
+    if (isAdmin) {
+      if (seat.assignedTo) {
+        // 배정된 좌석을 클릭한 경우 - 취소 또는 확정 옵션
+        const user = availableUsers.find(u => u.studentId === seat.assignedTo);
+        const userName = user ? user.name : seat.assignedTo;
+        
+        if (seat.confirmed) {
+          const confirm = window.confirm(
+            `${userName} (${seat.assignedTo})의 좌석 배정을 취소하시겠습니까?\n\n${seat.roomNumber}호 ${seat.number}번 좌석`
+          );
+          if (confirm) {
+            await handleUnassignSeat(seat);
+          }
+        } else {
+          const action = window.confirm(
+            `${userName} (${seat.assignedTo})의 좌석을 확정하시겠습니까?\n\n${seat.roomNumber}호 ${seat.number}번 좌석\n\n확인: 확정 / 취소: 배정 취소`
+          );
+          if (action) {
+            await handleConfirmSeat(seat);
+          } else {
+            const cancelAssign = window.confirm('배정을 취소하시겠습니까?');
+            if (cancelAssign) {
+              await handleUnassignSeat(seat);
+            }
+          }
+        }
+      } else {
+        // 빈 좌석을 클릭한 경우 - 사용자 선택 모달 열기
+        setSelectedSeatForAssign(seat);
+        await loadUsers();
+        setShowUserSelectModal(true);
+      }
+      return;
+    }
+    
+    // 일반 사용자 모드 (기존 로직)
     if (!isAdmin && userAssignedSeat && userAssignedSeat._id !== seat._id && !seat.assignedTo) {
       const confirm = window.confirm(`이미 ${userAssignedSeat.roomNumber}호 ${userAssignedSeat.number}번 좌석을 배정받으셨습니다. 기존 좌석을 취소하고 이 좌석으로 변경하시겠습니까?`);
       if (confirm) {
@@ -93,9 +158,7 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
       return;
     }
     
-    // If seat is already assigned to current user, offer to unassign
     if (seat.assignedTo === currentUser?.studentId) {
-      // Use a safer browser API check
       if (window.confirm) {
         const confirm = window.confirm('현재 배정된 좌석을 취소하시겠습니까?');
         if (confirm) {
@@ -105,40 +168,38 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
       return;
     }
     
-    // If seat is already assigned to someone else
     if (seat.assignedTo && !isAdmin) {
       toast.error('이미 배정된 좌석입니다.');
       return;
     }
     
-    // If admin, show additional options
-    if (isAdmin) {
-      if (seat.assignedTo) {
-        if (seat.confirmed) {
-          const confirm = window.confirm('배정을 취소하시겠습니까?');
-          if (confirm) {
-            await handleUnassignSeat(seat);
-          }
-        } else {
-          const confirm = window.confirm('배정을 확정하시겠습니까?');
-          if (confirm) {
-            await handleConfirmSeat(seat);
-          }
-        }
-      } else {
-        // Admin can assign to any user (implementation would need user selection UI)
-        const confirm = window.confirm('이 좌석을 배정하시겠습니까?');
-        if (confirm) {
-          await handleAssignSeat(seat);
-        }
-      }
-      return;
-    }
-    
-    // Normal user assigning a seat
     const confirm = window.confirm('이 좌석을 신청하시겠습니까?');
     if (confirm) {
       await handleAssignSeat(seat);
+    }
+  };
+
+  // 관리자용 좌석 배정
+  const handleAdminAssignSeat = async (studentId) => {
+    try {
+      setLoading(true);
+      const result = await adminAssignSeat(selectedSeatForAssign.number, selectedSeatForAssign.section, studentId);
+      
+      const user = availableUsers.find(u => u.studentId === studentId);
+      toast.success(`${user?.name || studentId}님에게 ${selectedSeatForAssign.roomNumber}호 ${selectedSeatForAssign.number}번 좌석이 배정되었습니다.`);
+      
+      setShowUserSelectModal(false);
+      setSelectedSeatForAssign(null);
+      setUserSearchTerm('');
+      
+      if (onSeatUpdate) {
+        onSeatUpdate();
+      }
+    } catch (error) {
+      console.error('Error admin assigning seat:', error);
+      toast.error(error.response?.data?.message || '좌석 배정 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -158,7 +219,6 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
       const result = await assignSeat(seat.number, seat.section);
       toast.success('좌석이 성공적으로 배정되었습니다.');
       
-      // 사용자 배정 좌석 업데이트
       setUserAssignedSeat(result.data);
       
       if (onSeatUpdate) {
@@ -178,7 +238,6 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
       const result = await unassignSeat(seat.number, seat.section);
       toast.success('좌석 배정이 취소되었습니다.');
       
-      // 사용자 배정 좌석 초기화
       setUserAssignedSeat(null);
       
       if (onSeatUpdate) {
@@ -413,6 +472,111 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
           <span className="text-sm">내 좌석</span>
         </div>
       </div>
+
+      {/* 관리자용 사용자 선택 모달 */}
+      {showUserSelectModal && selectedSeatForAssign && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4">
+              사용자 선택 - {selectedSeatForAssign.roomNumber}호 {selectedSeatForAssign.number}번 좌석
+            </h2>
+            
+            {/* 검색 입력 */}
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="학번 또는 이름으로 검색..."
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* 사용자 목록 */}
+            <div className="overflow-x-auto max-h-96">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">학번</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">우선순위</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">현재 좌석 배정 상태</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {availableUsers
+                    .filter(user => 
+                      !userSearchTerm || 
+                      user.studentId.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                      user.name.toLowerCase().includes(userSearchTerm.toLowerCase())
+                    )
+                    .map((user) => (
+                      <tr key={user.studentId} className={`hover:bg-gray-50 ${user.hasAssignment ? 'bg-yellow-50' : ''}`}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {user.studentId}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                            {user.priority}순위
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.hasAssignment ? (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                              {user.currentSeat}
+                            </span>
+                          ) : (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                              미배정
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => {
+                              if (user.hasAssignment) {
+                                const confirm = window.confirm(
+                                  `${user.name}님은 이미 ${user.currentSeat}에 배정되어 있습니다.\n기존 배정을 취소하고 새로운 좌석으로 변경하시겠습니까?`
+                                );
+                                if (confirm) {
+                                  handleAdminAssignSeat(user.studentId);
+                                }
+                              } else {
+                                handleAdminAssignSeat(user.studentId);
+                              }
+                            }}
+                            className="text-blue-600 hover:text-blue-900 font-medium"
+                            disabled={loading}
+                          >
+                            {user.hasAssignment ? '변경 배정' : '배정'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 모달 하단 버튼 */}
+            <div className="mt-6 flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowUserSelectModal(false);
+                  setSelectedSeatForAssign(null);
+                  setUserSearchTerm('');
+                }}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

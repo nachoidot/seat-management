@@ -324,4 +324,80 @@ exports.confirmSeat = async (req, res) => {
       error: err.message
     });
   }
+};
+
+// @desc    Admin assign seat to specific user
+// @route   PUT /api/seats/:number/:section/admin-assign
+// @access  Private (Admin only)
+exports.adminAssignSeat = async (req, res) => {
+  try {
+    const { number, section } = req.params;
+    const { studentId } = req.body;
+    
+    // 입력 검증
+    if (!number || !section || !studentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide seat number, section, and student ID'
+      });
+    }
+    
+    // Check if seat exists
+    let seat = await Seat.findOne({ number, section });
+    if (!seat) {
+      return res.status(404).json({
+        success: false,
+        message: `Seat not found with number ${number} in section ${section}`
+      });
+    }
+
+    // Check if seat is already assigned
+    if (seat.assignedTo) {
+      return res.status(400).json({
+        success: false,
+        message: 'This seat is already assigned to someone else'
+      });
+    }
+
+    // Check if user exists
+    const user = await User.findOne({ studentId });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `User not found with student ID ${studentId}`
+      });
+    }
+
+    // Check if user already has a seat assigned
+    const existingSeat = await Seat.findOne({ assignedTo: studentId });
+    if (existingSeat) {
+      return res.status(400).json({
+        success: false,
+        message: `User ${studentId} already has a seat assigned (${existingSeat.roomNumber}호 ${existingSeat.number}번)`
+      });
+    }
+
+    // Update seat
+    seat = await Seat.findOneAndUpdate(
+      { number, section },
+      { 
+        assignedTo: studentId, 
+        confirmed: false, // 관리자가 배정한 경우 확정 대기 상태
+        updatedAt: Date.now() 
+      },
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: seat
+    });
+  } catch (err) {
+    console.error('Error admin assigning seat:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: err.message
+    });
+  }
 }; 

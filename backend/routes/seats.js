@@ -4,7 +4,8 @@ const {
   getSeat, 
   assignSeat, 
   unassignSeat, 
-  confirmSeat 
+  confirmSeat,
+  adminAssignSeat 
 } = require('../controllers/seats');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -24,5 +25,8 @@ router.put('/:number/:section/unassign', protect, unassignSeat);
 
 // 좌석 배정 확정 (관리자 전용)
 router.put('/:number/:section/confirm', protect, authorize(true), confirmSeat);
+
+// 관리자용 좌석 배정 (관리자 전용)
+router.put('/:number/:section/admin-assign', protect, authorize(true), adminAssignSeat);
 
 module.exports = router; 
