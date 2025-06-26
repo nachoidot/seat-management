@@ -4,6 +4,13 @@ import { ensureServerAwake } from './wakeup';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+// 캐시 저장소
+const cache = new Map();
+const CACHE_DURATION = 30000; // 30초
+
+// 진행 중인 요청들을 추적하여 중복 요청 방지
+const ongoingRequests = new Map();
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_URL,
@@ -26,6 +33,50 @@ api.interceptors.request.use(
   }
 );
 
+// 캐시된 응답 확인 함수
+const getCachedResponse = (key) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  return null;
+};
+
+// 응답 캐시 저장 함수
+const setCachedResponse = (key, data) => {
+  cache.set(key, {
+    data,
+    timestamp: Date.now()
+  });
+};
+
+// 중복 요청 방지를 위한 함수
+const makeRequestWithDeduplication = async (key, requestFn) => {
+  // 캐시된 응답이 있으면 반환
+  const cached = getCachedResponse(key);
+  if (cached) {
+    return cached;
+  }
+
+  // 이미 진행 중인 요청이 있으면 기다림
+  if (ongoingRequests.has(key)) {
+    return ongoingRequests.get(key);
+  }
+
+  // 새로운 요청 시작
+  const requestPromise = requestFn().then(response => {
+    setCachedResponse(key, response);
+    ongoingRequests.delete(key);
+    return response;
+  }).catch(error => {
+    ongoingRequests.delete(key);
+    throw error;
+  });
+
+  ongoingRequests.set(key, requestPromise);
+  return requestPromise;
+};
+
 // Authentication API calls
 export const login = async (studentId, name, birthdate = '') => {
   const response = await api.post('/auth/login', {
@@ -43,11 +94,13 @@ export const getMe = async () => {
 
 // Seats API calls
 export const getSeats = async () => {
-  // 서버 Wake-up 확인
-  await ensureServerAwake();
-  
-  const response = await api.get('/seats');
-  return response.data;
+  return makeRequestWithDeduplication('seats', async () => {
+    // 서버 Wake-up 확인
+    await ensureServerAwake();
+    
+    const response = await api.get('/seats');
+    return response.data;
+  });
 };
 
 export const getSeat = async (number, section) => {
@@ -56,22 +109,34 @@ export const getSeat = async (number, section) => {
 };
 
 export const assignSeat = async (number, section) => {
+  // 좌석 배정 후 캐시 무효화
+  cache.delete('seats');
+  
   const response = await api.put(`/seats/${number}/${section}/assign`);
   return response.data;
 };
 
 export const unassignSeat = async (number, section) => {
+  // 좌석 해제 후 캐시 무효화
+  cache.delete('seats');
+  
   const response = await api.put(`/seats/${number}/${section}/unassign`);
   return response.data;
 };
 
 export const confirmSeat = async (number, section) => {
+  // 좌석 확정 후 캐시 무효화
+  cache.delete('seats');
+  
   const response = await api.put(`/seats/${number}/${section}/confirm`);
   return response.data;
 };
 
 // 좌석 일괄 확정
 export const bulkConfirmSeats = async (options = {}) => {
+  // 좌석 일괄 확정 후 캐시 무효화
+  cache.delete('seats');
+  
   const response = await api.post('/admin/seats/bulk-confirm', options);
   return response.data;
 };
@@ -84,11 +149,13 @@ export const getSeatAssignmentStats = async () => {
 
 // TimeSlots API calls
 export const getTimeSlots = async () => {
-  // 서버 Wake-up 확인
-  await ensureServerAwake();
-  
+  return makeRequestWithDeduplication('timeslots', async () => {
+    // 서버 Wake-up 확인
+    await ensureServerAwake();
+    
     const response = await api.get('/timeslots');
     return response.data;
+  });
 };
 
 // Admin API calls
@@ -124,6 +191,9 @@ export const bulkDeleteUsers = async (options = {}) => {
 };
 
 export const resetSeats = async () => {
+  // 좌석 리셋 후 캐시 무효화
+  cache.delete('seats');
+  
   const response = await api.put('/admin/seats/reset');
   return response.data;
 };
@@ -131,6 +201,10 @@ export const resetSeats = async () => {
 export const createTimeSlot = async (timeSlotData) => {
   try {
     console.log('createTimeSlot API 호출:', timeSlotData);
+    
+    // 타임슬롯 생성 후 캐시 무효화
+    cache.delete('timeslots');
+    
     const response = await api.post('/timeslots', timeSlotData);
     console.log('createTimeSlot 응답:', response);
     return response.data;
@@ -145,6 +219,10 @@ export const createTimeSlot = async (timeSlotData) => {
 export const updateTimeSlot = async (id, timeSlotData) => {
   try {
     console.log(`updateTimeSlot API 호출 - ID: ${id}`, timeSlotData);
+    
+    // 타임슬롯 수정 후 캐시 무효화
+    cache.delete('timeslots');
+    
     const response = await api.put(`/timeslots/${id}`, timeSlotData);
     console.log('updateTimeSlot 응답:', response);
     return response.data;
@@ -157,17 +235,26 @@ export const updateTimeSlot = async (id, timeSlotData) => {
 };
 
 export const deleteTimeSlot = async (id) => {
+  // 타임슬롯 삭제 후 캐시 무효화
+  cache.delete('timeslots');
+  
   const response = await api.delete(`/timeslots/${id}`);
   return response.data;
 };
 
 export const createBatchSeats = async (seatsData) => {
+  // 일괄 좌석 생성 후 캐시 무효화
+  cache.delete('seats');
+  
   const response = await api.post('/admin/seats/batch', { seats: seatsData });
   return response.data;
 };
 
 // 관리자용 좌석 배정
 export const adminAssignSeat = async (number, section, studentId) => {
+  // 관리자 좌석 배정 후 캐시 무효화
+  cache.delete('seats');
+  
   const response = await api.put(`/seats/${number}/${section}/admin-assign`, { studentId });
   return response.data;
 };
@@ -182,6 +269,15 @@ export const getAdminInfo = async () => {
 export const updateAdminInfo = async (adminInfo) => {
   const response = await api.put('/admin/info', adminInfo);
   return response.data;
+};
+
+// 캐시 수동 무효화 함수 (필요시 사용)
+export const invalidateCache = (key = null) => {
+  if (key) {
+    cache.delete(key);
+  } else {
+    cache.clear();
+  }
 };
 
 export default api; 

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { toast } from 'react-toastify';
 import { getCurrentUser } from '../utils/auth';
 import { assignSeat, unassignSeat, confirmSeat, adminAssignSeat, getUsers } from '../utils/api';
 import { FaColumns, FaFan, FaWindowMaximize, FaDoorOpen, FaMapMarkerAlt } from 'react-icons/fa';
 
-const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) => {
+const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) => {
   const [roomGroupedSeats, setRoomGroupedSeats] = useState({});
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedSeat, setSelectedSeat] = useState(null);
@@ -19,73 +19,85 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
   const [selectedSeatForAssign, setSelectedSeatForAssign] = useState(null);
   const [userSearchTerm, setUserSearchTerm] = useState('');
 
-  useEffect(() => {
-    // 클라이언트 사이드에서만 실행
-    if (typeof window === 'undefined') return;
-    
-    const user = getCurrentUser();
-    setCurrentUser(user);
+  // 현재 사용자 정보를 메모이제이션
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return getCurrentUser();
+  }, []);
 
-    // 좌석을 룸 번호별로 그룹화
-    if (seats && seats.length > 0) {
-      try {
-        const grouped = {};
-        
-        // 먼저 룸 번호별로 좌석을 그룹화
-        seats.forEach(seat => {
-          if (!grouped[seat.roomNumber]) {
-            grouped[seat.roomNumber] = [];
-          }
-          grouped[seat.roomNumber].push(seat);
-          
-          // 현재 사용자에게 배정된 좌석 확인
-          if (user && seat.assignedTo === user.studentId) {
-            setUserAssignedSeat(seat);
-            
-            // 사용자의 좌석이 있는 방을 기본으로 활성화
-            if (filterRoom === null) {
-              setActiveRoom(seat.roomNumber);
-            }
-          }
-        });
-        
-        // 각 룸 내에서 좌석을 행과 열로 배치
-        Object.keys(grouped).forEach(roomNumber => {
-          const roomSeats = grouped[roomNumber];
-          const maxRow = Math.max(...roomSeats.map(seat => seat.row || 0));
-          const maxCol = Math.max(...roomSeats.map(seat => seat.col || 0));
-          
-          const grid = Array(maxRow + 1).fill().map(() => Array(maxCol + 1).fill(null));
-          
-          roomSeats.forEach(seat => {
-            if (seat && typeof seat.row === 'number' && typeof seat.col === 'number') {
-              grid[seat.row][seat.col] = seat;
-            }
-          });
-          
-          grouped[roomNumber] = {
-            seats: roomSeats,
-            grid: grid
-          };
-        });
-        
-        setRoomGroupedSeats(grouped);
-        
-        // 필터링된 룸이 있으면 해당 룸을 활성화
-        if (filterRoom && grouped[filterRoom]) {
-          setActiveRoom(filterRoom);
-        } else if (Object.keys(grouped).length > 0 && !activeRoom) {
-          // 아니면 첫 번째 룸을 활성화 (사용자 좌석이 있는 방이 이미 활성화되지 않은 경우)
-          setActiveRoom(Object.keys(grouped)[0]);
+  // 룸별 좌석 그룹화를 메모이제이션
+  const processedSeats = useMemo(() => {
+    if (!seats || seats.length === 0) return {};
+    
+    try {
+      const grouped = {};
+      let foundUserSeat = null;
+      let defaultActiveRoom = null;
+      
+      // 먼저 룸 번호별로 좌석을 그룹화
+      seats.forEach(seat => {
+        if (!grouped[seat.roomNumber]) {
+          grouped[seat.roomNumber] = [];
         }
-      } catch (error) {
-        console.error('Error creating seat grid:', error);
+        grouped[seat.roomNumber].push(seat);
+        
+        // 현재 사용자에게 배정된 좌석 확인
+        if (user && seat.assignedTo === user.studentId) {
+          foundUserSeat = seat;
+          
+          // 사용자의 좌석이 있는 방을 기본으로 활성화
+          if (filterRoom === null) {
+            defaultActiveRoom = seat.roomNumber;
+          }
+        }
+      });
+      
+      // 각 룸 내에서 좌석을 행과 열로 배치
+      Object.keys(grouped).forEach(roomNumber => {
+        const roomSeats = grouped[roomNumber];
+        const maxRow = Math.max(...roomSeats.map(seat => seat.row || 0));
+        const maxCol = Math.max(...roomSeats.map(seat => seat.col || 0));
+        
+        const grid = Array(maxRow + 1).fill().map(() => Array(maxCol + 1).fill(null));
+        
+        roomSeats.forEach(seat => {
+          if (seat && typeof seat.row === 'number' && typeof seat.col === 'number') {
+            grid[seat.row][seat.col] = seat;
+          }
+        });
+        
+        grouped[roomNumber] = {
+          seats: roomSeats,
+          grid: grid
+        };
+      });
+      
+      return {
+        grouped,
+        userSeat: foundUserSeat,
+        defaultRoom: filterRoom || defaultActiveRoom || Object.keys(grouped)[0]
+      };
+    } catch (error) {
+      console.error('Error creating seat grid:', error);
+      return {};
+    }
+  }, [seats, user, filterRoom]);
+
+  useEffect(() => {
+    setCurrentUser(user);
+    
+    if (processedSeats.grouped) {
+      setRoomGroupedSeats(processedSeats.grouped);
+      setUserAssignedSeat(processedSeats.userSeat);
+      
+      if (processedSeats.defaultRoom && !activeRoom) {
+        setActiveRoom(processedSeats.defaultRoom);
       }
     }
-  }, [seats, filterRoom]);
+  }, [processedSeats, user, activeRoom]);
 
-  // 사용자 목록 로드
-  const loadUsers = async () => {
+  // 사용자 목록 로드를 useCallback으로 메모이제이션
+  const loadUsers = useCallback(async () => {
     try {
       const response = await getUsers();
       const users = response.data || [];
@@ -106,9 +118,9 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
       console.error('Error loading users:', error);
       toast.error('사용자 목록을 불러오는 중 오류가 발생했습니다.');
     }
-  };
+  }, [seats]);
 
-  const handleSeatClick = async (seat) => {
+  const handleSeatClick = useCallback(async (seat) => {
     if (loading || typeof window === 'undefined') return;
     
     setSelectedSeat(seat);
@@ -178,10 +190,10 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
     if (confirm) {
       await handleAssignSeat(seat);
     }
-  };
+  }, [loading, isAdmin, availableUsers, userAssignedSeat, currentUser, loadUsers]);
 
-  // 관리자용 좌석 배정
-  const handleAdminAssignSeat = async (studentId) => {
+  // 관리자용 좌석 배정을 useCallback으로 메모이제이션
+  const handleAdminAssignSeat = useCallback(async (studentId) => {
     try {
       setLoading(true);
       const result = await adminAssignSeat(selectedSeatForAssign.number, selectedSeatForAssign.section, studentId);
@@ -202,7 +214,7 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
     } finally {
       setLoading(false);
     }
-  };
+  }, [onSeatUpdate, selectedSeatForAssign, availableUsers]);
 
   const handleMouseEnter = (seat) => {
     if (!seat.objectType) {
@@ -538,7 +550,8 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               if (user.hasAssignment) {
                                 const confirm = window.confirm(
                                   `${user.name}님은 이미 ${user.currentSeat}에 배정되어 있습니다.\n기존 배정을 취소하고 새로운 좌석으로 변경하시겠습니까?`
@@ -565,7 +578,8 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
             {/* 모달 하단 버튼 */}
             <div className="mt-6 flex justify-end space-x-2">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setShowUserSelectModal(false);
                   setSelectedSeatForAssign(null);
                   setUserSearchTerm('');
@@ -580,6 +594,6 @@ const SeatGrid = ({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) =
       )}
     </div>
   );
-};
+});
 
 export default SeatGrid; 
