@@ -299,13 +299,18 @@ export default function AdminUsers() {
   };
 
   const downloadTemplate = () => {
-    const template = '학번,이름,생년월일,우선순위,관리자\n2021001,홍길동,19950101,3,false\n2021002,김철수,19940215,1,false';
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const template = '학번,이름,생년월일,우선순위,관리자\n2021001,홍길동,19950101,3,false\n2021002,김철수,19940215,1,false\n2023001,이영희,19960320,2,false\n2023002,박민수,19970815,1,true';
+    
+    // UTF-8 BOM 추가 (Excel에서 한글 인코딩 문제 해결)
+    const BOM = '\uFEFF';
+    const csvContent = BOM + template;
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', 'user_template.csv');
+      link.setAttribute('download', '사용자_템플릿.csv');
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
