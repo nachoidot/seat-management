@@ -125,32 +125,24 @@ async function testAPIEndpoints() {
   return results;
 }
 
-// 프론트엔드 Cron Job 테스트
-async function testVercelCronJob() {
-  console.log('\n⏰ Testing Vercel Cron Job...');
+// 프론트엔드 접근성 테스트
+async function testFrontendAccess() {
+  console.log('\n🌐 Testing Frontend Access...');
   
   try {
-    const response = await makeRequest(`${FRONTEND_URL}/api/cron/keep-alive`, {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer keep-alive-secret',
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await makeRequest(FRONTEND_URL);
     
     if (response.status === 200) {
-      const data = JSON.parse(response.data);
-      console.log('✅ Vercel Cron Job 성공!');
-      console.log(`   - Message: ${data.message}`);
-      console.log(`   - Timestamp: ${data.timestamp}`);
+      console.log('✅ Frontend Access 성공!');
+      console.log(`   - Status: ${response.status}`);
+      console.log(`   - Response size: ${response.data.length} bytes`);
       return true;
     } else {
-      console.log(`❌ Vercel Cron Job 실패: ${response.status}`);
-      console.log(`   Response: ${response.data}`);
+      console.log(`❌ Frontend Access 실패: ${response.status}`);
       return false;
     }
   } catch (error) {
-    console.log(`❌ Vercel Cron Job 오류: ${error.message}`);
+    console.log(`❌ Frontend Access 오류: ${error.message}`);
     return false;
   }
 }
@@ -194,8 +186,8 @@ async function runTests() {
   // 2. API 엔드포인트 테스트
   const apiResults = await testAPIEndpoints();
   
-  // 3. Vercel Cron Job 테스트
-  const cronOk = await testVercelCronJob();
+  // 3. 프론트엔드 접근성 테스트
+  const frontendOk = await testFrontendAccess();
   
   // 4. 연속 테스트
   await testContinuousWakeup(3);
@@ -204,14 +196,14 @@ async function runTests() {
   console.log('\n📊 테스트 결과 요약:');
   console.log('='.repeat(50));
   console.log(`🏥 Backend Health: ${healthOk ? '✅ PASS' : '❌ FAIL'}`);
-  console.log(`⏰ Vercel Cron Job: ${cronOk ? '✅ PASS' : '❌ FAIL'}`);
+  console.log(`🌐 Frontend Access: ${frontendOk ? '✅ PASS' : '❌ FAIL'}`);
   
   const apiSuccess = apiResults.filter(r => r.success).length;
   const apiTotal = apiResults.length;
   console.log(`🔧 API Endpoints: ${apiSuccess}/${apiTotal} PASS`);
   
-  if (healthOk && cronOk && apiSuccess === apiTotal) {
-    console.log('\n🎉 모든 테스트 통과! Keep-Alive 시스템이 정상 작동합니다.');
+  if (healthOk && frontendOk && apiSuccess === apiTotal) {
+    console.log('\n🎉 모든 테스트 통과! 무료 Keep-Alive 시스템이 정상 작동합니다.');
   } else {
     console.log('\n⚠️ 일부 테스트 실패. 설정을 확인해주세요.');
   }
@@ -225,6 +217,6 @@ if (require.main === module) {
 module.exports = {
   testBackendHealth,
   testAPIEndpoints,
-  testVercelCronJob,
+  testFrontendAccess,
   testContinuousWakeup
 }; 
