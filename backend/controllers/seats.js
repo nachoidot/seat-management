@@ -39,10 +39,18 @@ exports.getSeat = async (req, res) => {
   try {
     const { number, section } = req.params;
     
-    if (!number || !section) {
+    // 입력값 검증 강화
+    if (!validateSeatNumber(number)) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide both seat number and section'
+        message: '좌석 번호 형식이 올바르지 않습니다 (1-10자리 영문, 숫자 조합)'
+      });
+    }
+
+    if (!validateSection(section)) {
+      return res.status(400).json({
+        success: false,
+        message: '섹션 형식이 올바르지 않습니다 (1-20자리 영문, 숫자, -, _ 조합)'
       });
     }
     
@@ -69,6 +77,21 @@ exports.getSeat = async (req, res) => {
   }
 };
 
+// 입력값 검증 헬퍼 함수들
+const validateSeatNumber = (number) => {
+  if (!number) return false;
+  const n = number.toString().trim();
+  // 좌석 번호는 1자리 이상 10자리 이하의 숫자와 문자 조합
+  return /^[a-zA-Z0-9]{1,10}$/.test(n);
+};
+
+const validateSection = (section) => {
+  if (!section) return false;
+  const s = section.toString().trim();
+  // 섹션은 1자리 이상 20자리 이하의 문자
+  return /^[a-zA-Z0-9\-_]{1,20}$/.test(s);
+};
+
 // @desc    Assign a seat to a student
 // @route   PUT /api/seats/:number/:section/assign
 // @access  Private
@@ -76,11 +99,18 @@ exports.assignSeat = async (req, res) => {
   try {
     const { number, section } = req.params;
     
-    // 입력 검증
-    if (!number || !section) {
+    // 입력값 검증 강화
+    if (!validateSeatNumber(number)) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide both seat number and section'
+        message: '좌석 번호 형식이 올바르지 않습니다 (1-10자리 영문, 숫자 조합)'
+      });
+    }
+
+    if (!validateSection(section)) {
+      return res.status(400).json({
+        success: false,
+        message: '섹션 형식이 올바르지 않습니다 (1-20자리 영문, 숫자, -, _ 조합)'
       });
     }
     

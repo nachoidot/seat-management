@@ -3,13 +3,75 @@ const User = require('../models/User');
 const AdminInfo = require('../models/AdminInfo');
 const XLSX = require('xlsx');
 
-// 관리자 정보 (환경변수나 설정 파일 대신 직접 관리)
-let adminInfo = {
-  name: process.env.ADMIN_NAME || '관리자',
-  phone: process.env.ADMIN_PHONE || '02-0000-0000', 
-  email: process.env.ADMIN_EMAIL || 'admin@sogang.ac.kr',
-  department: process.env.ADMIN_DEPARTMENT || '경제학과',
-  position: process.env.ADMIN_POSITION || '주임조교'
+// 입력값 검증 헬퍼 함수들
+const validateStudentId = (studentId) => {
+  if (!studentId) return false;
+  const id = studentId.toString().trim();
+  // 학번은 4자리 이상 20자리 이하의 숫자와 문자 조합
+  return /^[a-zA-Z0-9]{4,20}$/.test(id);
+};
+
+const validateName = (name) => {
+  if (!name) return false;
+  const n = name.toString().trim();
+  // 이름은 1자리 이상 50자리 이하의 한글, 영문, 공백 허용
+  return /^[가-힣a-zA-Z\s]{1,50}$/.test(n);
+};
+
+const validatePriority = (priority) => {
+  const p = parseInt(priority);
+  return !isNaN(p) && p >= 1 && p <= 12;
+};
+
+const validateSeatNumber = (number) => {
+  if (!number) return false;
+  const n = number.toString().trim();
+  // 좌석 번호는 1자리 이상 10자리 이하의 숫자와 문자 조합
+  return /^[a-zA-Z0-9]{1,10}$/.test(n);
+};
+
+const validateSection = (section) => {
+  if (!section) return false;
+  const s = section.toString().trim();
+  // 섹션은 1자리 이상 20자리 이하의 문자
+  return /^[a-zA-Z0-9\-_]{1,20}$/.test(s);
+};
+
+const validateRoomNumber = (roomNumber) => {
+  if (!roomNumber) return false;
+  const r = roomNumber.toString().trim();
+  // 방 번호는 3자리 숫자 (501~510 등)
+  return /^[0-9]{3,4}$/.test(r);
+};
+
+// AdminInfo DB 관리 헬퍼 함수들
+const getAdminInfoFromDB = async () => {
+  try {
+    let adminInfo = await AdminInfo.findOne();
+    
+    if (!adminInfo) {
+      // DB에 adminInfo가 없으면 기본값으로 생성
+      adminInfo = await AdminInfo.create({
+        name: process.env.ADMIN_NAME || '관리자',
+        phone: process.env.ADMIN_PHONE || '02-0000-0000',
+        email: process.env.ADMIN_EMAIL || 'admin@sogang.ac.kr',
+        department: process.env.ADMIN_DEPARTMENT || '경제학과',
+        position: process.env.ADMIN_POSITION || '주임조교'
+      });
+    }
+    
+    return adminInfo;
+  } catch (error) {
+    console.error('Error getting admin info from DB:', error);
+    // DB 오류 시 기본값 반환
+    return {
+      name: '관리자',
+      phone: '02-0000-0000',
+      email: 'admin@sogang.ac.kr',
+      department: '경제학과',
+      position: '주임조교'
+    };
+  }
 };
 
 // @desc    Get all users
@@ -42,24 +104,30 @@ exports.createUser = async (req, res) => {
   try {
     const { studentId, name, birthdate = '', priority = 3, isAdmin = false } = req.body;
 
-    // 필수 필드 검증 - 생년월일은 선택사항
-    if (!studentId || !name) {
+    // 입력값 검증 강화
+    if (!validateStudentId(studentId)) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide student ID and name'
+        message: '학번/수험번호는 4-20자리의 영문, 숫자 조합이어야 합니다'
       });
     }
 
-    // 우선순위 검증
-    if (priority < 1 || priority > 12) {
+    if (!validateName(name)) {
       return res.status(400).json({
         success: false,
-        message: 'Priority must be between 1 and 12'
+        message: '이름은 1-50자리의 한글, 영문, 공백만 허용됩니다'
+      });
+    }
+
+    if (!validatePriority(priority)) {
+      return res.status(400).json({
+        success: false,
+        message: '우선순위는 1-12 사이의 숫자여야 합니다'
       });
     }
 
     // 기존 사용자 중복 검사
-    const existingUser = await User.findOne({ studentId });
+    const existingUser = await User.findOne({ studentId: studentId.toString().trim() });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -69,12 +137,12 @@ exports.createUser = async (req, res) => {
 
     // 사용자 생성 (초기 비밀번호: sg1234)
     const user = await User.create({
-      studentId,
-      name,
+      studentId: studentId.toString().trim(),
+      name: name.toString().trim(),
       password: 'sg1234', // 초기 비밀번호 설정
-      birthdate: birthdate || '', // 빈 문자열로 기본값 설정
-      priority,
-      isAdmin
+      birthdate: birthdate ? birthdate.toString().trim() : '', // 빈 문자열로 기본값 설정
+      priority: parseInt(priority),
+      isAdmin: Boolean(isAdmin)
     });
 
     res.status(201).json({
@@ -116,6 +184,30 @@ exports.updateUser = async (req, res) => {
       });
     }
 
+    // 입력값 검증 강화
+    const { studentId, name, priority } = req.body;
+    
+    if (studentId && !validateStudentId(studentId)) {
+      return res.status(400).json({
+        success: false,
+        message: '학번/수험번호는 4-20자리의 영문, 숫자 조합이어야 합니다'
+      });
+    }
+
+    if (name && !validateName(name)) {
+      return res.status(400).json({
+        success: false,
+        message: '이름은 1-50자리의 한글, 영문, 공백만 허용됩니다'
+      });
+    }
+
+    if (priority !== undefined && !validatePriority(priority)) {
+      return res.status(400).json({
+        success: false,
+        message: '우선순위는 1-12 사이의 숫자여야 합니다'
+      });
+    }
+
     let user = await User.findOne({ studentId: req.params.id });
 
     if (!user) {
@@ -125,9 +217,16 @@ exports.updateUser = async (req, res) => {
       });
     }
 
+    // 타입 변환하여 업데이트
+    const updateData = { ...req.body };
+    if (updateData.studentId) updateData.studentId = updateData.studentId.toString().trim();
+    if (updateData.name) updateData.name = updateData.name.toString().trim();
+    if (updateData.priority) updateData.priority = parseInt(updateData.priority);
+    if (updateData.isAdmin !== undefined) updateData.isAdmin = Boolean(updateData.isAdmin);
+
     user = await User.findOneAndUpdate(
       { studentId: req.params.id },
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
 
@@ -315,23 +414,65 @@ exports.createBatchSeats = async (req, res) => {
       });
     }
 
-    // 각 좌석에 type이 없으면 룸 번호에 따라 자동으로 추가
-    const processedSeats = seats.map(seat => {
+    // 입력값 검증 강화
+    const validSeats = [];
+    const errors = [];
+
+    for (let i = 0; i < seats.length; i++) {
+      const seat = seats[i];
+      const seatNum = i + 1;
+
+      // 필수 필드 검증
+      if (!validateSeatNumber(seat.number)) {
+        errors.push(`좌석 ${seatNum}: 좌석 번호가 유효하지 않습니다`);
+        continue;
+      }
+
+      if (!validateRoomNumber(seat.roomNumber)) {
+        errors.push(`좌석 ${seatNum}: 방 번호가 유효하지 않습니다 (3-4자리 숫자)`);
+        continue;
+      }
+
+      // row, col 검증 (숫자 타입)
+      const row = parseInt(seat.row);
+      const col = parseInt(seat.col);
+      if (isNaN(row) || isNaN(col) || row < 0 || col < 0) {
+        errors.push(`좌석 ${seatNum}: row, col은 0 이상의 숫자여야 합니다`);
+        continue;
+      }
+
       // 룸 번호에 따라 좌석 유형을 자동으로 결정
-      if (!seat.type) {
+      let seatType = seat.type;
+      if (!seatType) {
         // 501, 503, 505, 507은 박사 과정 연구실
-        if (['501', '503', '505', '507'].includes(seat.roomNumber)) {
-          seat.type = '박사';
+        if (['501', '503', '505', '507'].includes(seat.roomNumber.toString())) {
+          seatType = '박사';
         } else {
           // 504, 506, 508, 510은 석사 과정 연구실
-          seat.type = '석사';
+          seatType = '석사';
         }
       }
-      
-      return seat;
-    });
 
-    const result = await Seat.insertMany(processedSeats);
+      validSeats.push({
+        ...seat,
+        number: seat.number.toString().trim(),
+        roomNumber: seat.roomNumber.toString().trim(),
+        row: row,
+        col: col,
+        type: seatType,
+        active: seat.active !== undefined ? Boolean(seat.active) : true
+      });
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: '다음 오류를 수정해 주세요:',
+        errors: errors
+      });
+    }
+
+    const result = await Seat.insertMany(validSeats);
 
     res.status(201).json({
       success: true,
@@ -374,7 +515,7 @@ exports.bulkCreateUsers = async (req, res) => {
       });
     }
 
-    // 데이터 유효성 검사
+    // 데이터 유효성 검사 강화
     const validUsers = [];
     const errors = [];
 
@@ -382,33 +523,42 @@ exports.bulkCreateUsers = async (req, res) => {
       const user = users[i];
       const rowNum = i + 1;
 
-      // 필수 필드 검사
-      if (!user.studentId || !user.name) {
-        errors.push(`행 ${rowNum}: 학번/수험번호, 이름은 필수입니다`);
+      // 학번/수험번호 검증
+      if (!validateStudentId(user.studentId)) {
+        errors.push(`행 ${rowNum}: 학번/수험번호는 4-20자리의 영문, 숫자 조합이어야 합니다`);
         continue;
       }
 
-      // 우선순위 검사
-      const priority = parseInt(user.priority);
-      if (!priority || priority < 1 || priority > 12) {
+      // 이름 검증
+      if (!validateName(user.name)) {
+        errors.push(`행 ${rowNum}: 이름은 1-50자리의 한글, 영문, 공백만 허용됩니다`);
+        continue;
+      }
+
+      // 우선순위 검증
+      if (!validatePriority(user.priority)) {
         errors.push(`행 ${rowNum}: 우선순위는 1-12 사이의 숫자여야 합니다`);
         continue;
       }
 
       // 기존 사용자 중복 검사
-      const existingUser = await User.findOne({ studentId: user.studentId });
+      const studentId = user.studentId.toString().trim();
+      const existingUser = await User.findOne({ studentId });
       if (existingUser) {
-        errors.push(`행 ${rowNum}: 학번/수험번호 ${user.studentId}는 이미 존재합니다`);
+        errors.push(`행 ${rowNum}: 학번/수험번호 ${studentId}는 이미 존재합니다`);
         continue;
       }
 
+      // isAdmin 검증
+      const isAdmin = user.isAdmin === 'true' || user.isAdmin === true || user.isAdmin === 1;
+
       validUsers.push({
-        studentId: user.studentId.toString().trim(),
+        studentId: studentId,
         name: user.name.toString().trim(),
         password: 'sg1234', // 초기 비밀번호 설정
         birthdate: user.birthdate ? user.birthdate.toString().trim() : '', // 빈 값 허용
-        priority: priority,
-        isAdmin: user.isAdmin === 'true' || user.isAdmin === true || false
+        priority: parseInt(user.priority),
+        isAdmin: isAdmin
       });
     }
 
@@ -461,27 +611,49 @@ exports.bulkConfirmSeats = async (req, res) => {
     
     let filter = {};
     
-    if (confirmAll) {
+    if (confirmAll === true) {
       // 모든 배정된 좌석을 확정
       filter = { assignedTo: { $ne: null }, confirmed: false };
-    } else if (roomNumbers && roomNumbers.length > 0) {
+    } else if (roomNumbers && Array.isArray(roomNumbers) && roomNumbers.length > 0) {
+      // 방 번호 검증
+      const validRoomNumbers = roomNumbers.filter(room => validateRoomNumber(room));
+      if (validRoomNumbers.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '유효한 방 번호가 없습니다 (3-4자리 숫자)'
+        });
+      }
+      
       // 특정 방의 배정된 좌석들을 확정
       filter = { 
-        roomNumber: { $in: roomNumbers }, 
+        roomNumber: { $in: validRoomNumbers.map(r => r.toString()) }, 
         assignedTo: { $ne: null }, 
         confirmed: false 
       };
-    } else if (seatIds && seatIds.length > 0) {
+    } else if (seatIds && Array.isArray(seatIds) && seatIds.length > 0) {
+      // MongoDB ObjectId 검증
+      const validSeatIds = seatIds.filter(id => {
+        if (!id) return false;
+        return /^[0-9a-fA-F]{24}$/.test(id.toString());
+      });
+      
+      if (validSeatIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '유효한 좌석 ID가 없습니다'
+        });
+      }
+      
       // 특정 좌석들을 확정
       filter = { 
-        _id: { $in: seatIds }, 
+        _id: { $in: validSeatIds }, 
         assignedTo: { $ne: null }, 
         confirmed: false 
       };
     } else {
       return res.status(400).json({
         success: false,
-        message: 'Please provide seatIds, roomNumbers, or set confirmAll to true'
+        message: 'seatIds, roomNumbers를 제공하거나 confirmAll을 true로 설정해주세요'
       });
     }
 
@@ -574,23 +746,37 @@ exports.bulkDeleteUsers = async (req, res) => {
     
     let filter = {};
     
-    if (deleteAll) {
+    if (deleteAll === true) {
       // 모든 사용자 삭제 (관리자와 admin 계정 제외)
       filter = { 
         isAdmin: { $ne: true },
         studentId: { $ne: 'admin' }
       };
-    } else if (userIds && userIds.length > 0) {
+    } else if (userIds && Array.isArray(userIds) && userIds.length > 0) {
+      // 학번/수험번호 검증
+      const validUserIds = userIds.filter(id => {
+        if (!id) return false;
+        // admin 계정 보호
+        if (id.toString() === 'admin') return false;
+        return validateStudentId(id);
+      });
+      
+      if (validUserIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '유효한 사용자 ID가 없습니다'
+        });
+      }
+      
       // 특정 사용자들 삭제 (관리자와 admin 계정 제외)
       filter = { 
-        studentId: { $in: userIds },
-        isAdmin: { $ne: true },
-        studentId: { $ne: 'admin' }
+        studentId: { $in: validUserIds.map(id => id.toString().trim()) },
+        isAdmin: { $ne: true }
       };
     } else {
       return res.status(400).json({
         success: false,
-        message: 'Please provide userIds or set deleteAll to true'
+        message: 'userIds를 제공하거나 deleteAll을 true로 설정해주세요'
       });
     }
 
@@ -631,6 +817,8 @@ exports.bulkDeleteUsers = async (req, res) => {
 // @access  Public (for login page)
 exports.getAdminInfo = async (req, res) => {
   try {
+    const adminInfo = await getAdminInfoFromDB();
+    
     res.status(200).json({
       success: true,
       data: adminInfo
@@ -651,22 +839,50 @@ exports.updateAdminInfo = async (req, res) => {
   try {
     const { name, phone, email, department, position } = req.body;
     
-    // 필수 필드 검증
-    if (!name || !phone || !email) {
+    // 입력값 검증 강화
+    if (!name || name.toString().trim().length === 0) {
       return res.status(400).json({
         success: false,
-        message: '이름, 전화번호, 이메일은 필수 입력 항목입니다.'
+        message: '이름은 필수 입력 항목입니다.'
       });
     }
-    
-    // 메모리의 관리자 정보 업데이트
-    adminInfo = {
-      name: name.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      department: (department || '경제학과').trim(),
-      position: (position || '주임조교').trim()
+
+    if (!phone || !/^[0-9\-\+\(\)\s]{8,20}$/.test(phone.toString().trim())) {
+      return res.status(400).json({
+        success: false,
+        message: '전화번호 형식이 올바르지 않습니다. (8-20자리 숫자, -, +, (), 공백 허용)'
+      });
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toString().trim())) {
+      return res.status(400).json({
+        success: false,
+        message: '이메일 형식이 올바르지 않습니다.'
+      });
+    }
+
+    const updateData = {
+      name: name.toString().trim(),
+      phone: phone.toString().trim(),
+      email: email.toString().trim(),
+      department: department ? department.toString().trim() : '경제학과',
+      position: position ? position.toString().trim() : '주임조교'
     };
+
+    // DB에서 관리자 정보 업데이트 또는 생성
+    let adminInfo = await AdminInfo.findOne();
+    
+    if (adminInfo) {
+      // 기존 정보 업데이트
+      adminInfo = await AdminInfo.findOneAndUpdate(
+        {},
+        updateData,
+        { new: true, runValidators: true }
+      );
+    } else {
+      // 새로 생성
+      adminInfo = await AdminInfo.create(updateData);
+    }
     
     res.status(200).json({
       success: true,
@@ -675,6 +891,13 @@ exports.updateAdminInfo = async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating admin info:', err);
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map(val => val.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(', ')
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Server error'
