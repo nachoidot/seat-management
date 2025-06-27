@@ -59,6 +59,11 @@ const SeatSchema = new mongoose.Schema({
   }
 });
 
+// 복합 인덱스 설정
 SeatSchema.index({ number: 1, section: 1 }, { unique: true });
+
+// assignedTo 필드에 sparse unique 인덱스 추가 (null 값은 중복 허용, 값이 있으면 유니크)
+// 이렇게 하면 한 사용자가 여러 좌석을 배정받는 것을 DB 레벨에서 방지
+SeatSchema.index({ assignedTo: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Seat', SeatSchema); 

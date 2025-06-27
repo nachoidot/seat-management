@@ -200,41 +200,70 @@ exports.assignSeat = async (req, res) => {
       }
     }
 
-    // Check if seat is available
-    let seat = await Seat.findOne({ number, section });
-    if (!seat) {
+    // Race condition 방지: 원자적 연산으로 좌석 배정 처리
+    // 1. 사용자가 이미 좌석을 보유했는지 확인 및 좌석 배정을 한 번의 트랜잭션으로 처리
+    
+    // 먼저 좌석이 존재하는지 확인
+    const seatExists = await Seat.findOne({ number, section });
+    if (!seatExists) {
       return res.status(404).json({
         success: false,
         message: `Seat not found with number ${number} in section ${section}`
       });
     }
 
-    if (seat.assignedTo && !user.isAdmin) {
-      return res.status(400).json({
-        success: false,
-        message: 'This seat is already assigned'
-      });
-    }
+    let seat;
+    
+    if (user.isAdmin) {
+      // 관리자는 제약 없이 배정 가능
+      seat = await Seat.findOneAndUpdate(
+        { number, section },
+        { 
+          assignedTo: req.user.studentId,
+          confirmed: true,
+          updatedAt: Date.now()
+        },
+        { new: true, runValidators: true }
+      );
+    } else {
+      // 일반 사용자의 경우 완전한 원자적 연산으로 race condition 방지
+      // MongoDB의 sparse unique 인덱스와 함께 작동하여 이중 보호 제공
+      
+      try {
+        // 원자적 좌석 배정: 좌석이 비어있을 때만 배정
+        // assignedTo의 sparse unique 인덱스가 중복 배정을 DB 레벨에서 방지
+        seat = await Seat.findOneAndUpdate(
+          { 
+            number, 
+            section,
+            assignedTo: null  // 중요: 좌석이 비어있을 때만 배정
+          },
+          { 
+            assignedTo: req.user.studentId,
+            confirmed: false,
+            updatedAt: Date.now()
+          },
+          { new: true, runValidators: true }
+        );
 
-    // Check if user already has a seat
-    const existingSeat = await Seat.findOne({ assignedTo: req.user.studentId });
-    if (existingSeat && !user.isAdmin) {
-      return res.status(400).json({
-        success: false,
-        message: 'You already have a seat assigned'
-      });
+        // 좌석이 이미 배정되어 있어서 업데이트가 실패한 경우
+        if (!seat) {
+          return res.status(400).json({
+            success: false,
+            message: 'This seat is already assigned'
+          });
+        }
+      } catch (duplicateError) {
+        // MongoDB duplicate key error로 인한 실패 (사용자가 이미 다른 좌석 보유)
+        if (duplicateError.code === 11000 && duplicateError.keyPattern?.assignedTo) {
+          return res.status(400).json({
+            success: false,
+            message: 'You already have a seat assigned'
+          });
+        }
+        throw duplicateError; // 다른 에러는 상위 catch로 전달
+      }
     }
-
-    // Update seat
-    seat = await Seat.findOneAndUpdate(
-      { number, section },
-      { 
-        assignedTo: req.user.studentId,
-        confirmed: user.isAdmin ? true : false,
-        updatedAt: Date.now()
-      },
-      { new: true, runValidators: true }
-    );
 
     res.status(200).json({
       success: true,
@@ -242,6 +271,15 @@ exports.assignSeat = async (req, res) => {
     });
   } catch (err) {
     console.error('Error assigning seat:', err);
+    
+    // MongoDB duplicate key error (사용자가 이미 다른 좌석을 보유한 경우)
+    if (err.code === 11000 && err.keyPattern?.assignedTo) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have a seat assigned'
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Server error',

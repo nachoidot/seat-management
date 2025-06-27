@@ -519,6 +519,7 @@ exports.bulkCreateUsers = async (req, res) => {
     const validUsers = [];
     const errors = [];
 
+    // 첫 번째 패스: 기본 유효성 검사 및 데이터 정규화
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       const rowNum = i + 1;
@@ -541,18 +542,12 @@ exports.bulkCreateUsers = async (req, res) => {
         continue;
       }
 
-      // 기존 사용자 중복 검사
-      const studentId = user.studentId.toString().trim();
-      const existingUser = await User.findOne({ studentId });
-      if (existingUser) {
-        errors.push(`행 ${rowNum}: 학번/수험번호 ${studentId}는 이미 존재합니다`);
-        continue;
-      }
-
       // isAdmin 검증
       const isAdmin = user.isAdmin === 'true' || user.isAdmin === true || user.isAdmin === 1;
 
+      const studentId = user.studentId.toString().trim();
       validUsers.push({
+        rowNum,
         studentId: studentId,
         name: user.name.toString().trim(),
         password: 'sg1234', // 초기 비밀번호 설정
@@ -570,7 +565,32 @@ exports.bulkCreateUsers = async (req, res) => {
       });
     }
 
-    if (validUsers.length === 0) {
+    // 두 번째 패스: 모든 학번을 한 번의 쿼리로 중복 검사 (성능 최적화)
+    const studentIds = validUsers.map(user => user.studentId);
+    const existingUsers = await User.find({ studentId: { $in: studentIds } }, 'studentId');
+    const existingStudentIds = new Set(existingUsers.map(user => user.studentId));
+
+    // 중복 검사 결과 반영
+    const finalValidUsers = [];
+    for (const user of validUsers) {
+      if (existingStudentIds.has(user.studentId)) {
+        errors.push(`행 ${user.rowNum}: 학번/수험번호 ${user.studentId}는 이미 존재합니다`);
+        continue;
+      }
+      // rowNum은 DB 저장 시 제외
+      const { rowNum, ...userWithoutRowNum } = user;
+      finalValidUsers.push(userWithoutRowNum);
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: '다음 오류를 수정해 주세요:',
+        errors: errors
+      });
+    }
+
+    if (finalValidUsers.length === 0) {
       return res.status(400).json({
         success: false,
         message: '유효한 사용자 데이터가 없습니다'
@@ -578,7 +598,7 @@ exports.bulkCreateUsers = async (req, res) => {
     }
 
     // 사용자 일괄 생성
-    const createdUsers = await User.insertMany(validUsers);
+    const createdUsers = await User.insertMany(finalValidUsers);
 
     res.status(201).json({
       success: true,
