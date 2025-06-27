@@ -35,6 +35,13 @@ exports.login = async (req, res) => {
     }
 
     // 비밀번호 확인
+    if (!user.password) {
+      return res.status(401).json({
+        success: false,
+        message: 'User has no password set. Please contact administrator.'
+      });
+    }
+    
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({
@@ -46,12 +53,11 @@ exports.login = async (req, res) => {
     // 로그인 성공
     sendTokenResponse(user, 200, res);
   } catch (err) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Login error:', err);
-    }
+    console.error('Login error:', err);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
     });
   }
 };

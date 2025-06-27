@@ -15,7 +15,7 @@ const UserSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Please add a password'],
+    required: false, // 기존 사용자 호환성을 위해 false로 변경
     minlength: 6,
     select: false // 기본적으로 비밀번호는 조회 시 제외
   },
