@@ -1,32 +1,63 @@
-# 연구실 자리 배정 시스템
+# 연구실 자리 배정 시스템 (보안 강화 버전) 🔐
 
-대학원 연구실 석사/박사 과정 학생들의 자리 신청 및 배정을 자동화하는 웹 애플리케이션입니다.
+대학원 연구실 석사/박사 과정 학생들의 자리 신청 및 배정을 자동화하는 **보안 강화** 웹 애플리케이션입니다.
+
+## 🔒 보안 강화 사항 (2024.11)
+
+### 1. 비밀번호 기반 인증 시스템
+- **기존**: 학번 + 이름만으로 로그인 (타인 정보 악용 가능)
+- **개선**: bcrypt 해시화된 비밀번호 필수 인증
+- **초기 비밀번호**: 모든 사용자에게 "sg1234" 자동 할당
+- **비밀번호 변경**: 메인 페이지에서 즉시 변경 가능
+
+### 2. HttpOnly Cookie 기반 토큰 저장
+- **기존**: localStorage에 JWT 토큰 저장 (XSS 공격 취약)
+- **개선**: HttpOnly, Secure, SameSite 쿠키로 토큰 저장
+- **XSS 방어**: JavaScript로 토큰 접근 완전 차단
+- **CSRF 방어**: SameSite 속성으로 추가 보안
+
+### 3. 서버 기반 인증 확인
+- **기존**: 클라이언트에서 localStorage 토큰 확인
+- **개선**: `/auth/me` API로 서버에서 인증 상태 확인
+- **토큰 무효화**: 로그아웃 시 서버에서 쿠키 완전 삭제
+- **세션 보안**: 서버 검증을 통한 안전한 세션 관리
+
+### 4. 민감정보 로깅 제거
+- **기존**: 모든 환경에서 상세 로그 출력
+- **개선**: 프로덕션에서 민감정보 로깅 완전 차단
+- **DB 연결 정보**: 마스킹 처리
+- **사용자 정보**: 개발환경에서만 출력
+
+### 5. UI/UX 개선
+- **생년월일 필드 제거**: 사용자 편의성 향상
+- **간편 로그인**: 학번 + 비밀번호로 간소화
+- **비밀번호 변경 모달**: 메인 페이지에 통합
+- **즉시 UI 업데이트**: 로그아웃 시 상태 즉시 반영
 
 ## 🛠 기술 스택
 
 ### 백엔드
 - **Node.js** + **Express.js**
 - **MongoDB** (MongoDB Atlas)
-- **JWT** 인증
-- **CORS** 설정
+- **JWT** 인증 + **HttpOnly Cookies**
+- **bcryptjs** 비밀번호 해시화
+- **cookie-parser** 쿠키 파싱
+- **CORS** 보안 설정
 - **File Upload** (multer)
 
 ### 프론트엔드
 - **Next.js**
 - **React**
 - **TailwindCSS**
-- **Axios**
+- **Axios** (withCredentials: true)
 - **React Icons**
 - **React Toastify**
 
 ## 🚀 배포
 
-- 프론트엔드: **Vercel**
-<<<<<<< HEAD
-- 백엔드: **CloudType**
-=======
-
-- 데이터베이스: **MongoDB Atlas**
+- **프론트엔드**: Vercel
+- **백엔드**: CloudType
+- **데이터베이스**: MongoDB Atlas
 
 ## 🏗 프로젝트 구조
 
@@ -35,27 +66,27 @@ seat-management/
 ├── backend/                # Express.js 백엔드
 │   ├── controllers/        # API 컨트롤러들
 │   │   ├── admin.js        # 관리자 기능 (통계, 사용자 관리, 좌석 관리)
-│   │   ├── auth.js         # 인증 관련
+│   │   ├── auth.js         # 인증 관련 (비밀번호 변경, 로그아웃 포함)
 │   │   ├── seats.js        # 좌석 배정 로직
 │   │   └── timeslots.js    # 시간 슬롯 관리
 │   ├── middleware/         # 미들웨어 함수들
-│   │   └── auth.js         # JWT 인증 미들웨어
+│   │   └── auth.js         # JWT 인증 미들웨어 (쿠키 + 헤더)
 │   ├── models/             # MongoDB 모델들
 │   │   ├── AdminInfo.js    # 관리자 정보 모델
 │   │   ├── Seat.js         # 좌석 모델
 │   │   ├── TimeSlot.js     # 시간 슬롯 모델
-│   │   └── User.js         # 사용자 모델
+│   │   └── User.js         # 사용자 모델 (비밀번호 필드 추가)
 │   ├── routes/             # API 라우트들
 │   ├── scripts/            # 데이터베이스 스크립트들
 │   ├── .env                # 환경 변수 설정
 │   ├── package.json        # 의존성 관리
-│   └── server.js           # 서버 진입점
+│   └── server.js           # 서버 진입점 (보안 로깅)
 │
 └── frontend/               # Next.js 프론트엔드
     ├── components/         # 재사용 가능한 컴포넌트들
     │   ├── AdminNav.js     # 관리자 네비게이션
     │   ├── Footer.js       # 푸터
-    │   ├── Header.js       # 헤더 (세션 타임아웃 표시)
+    │   ├── Header.js       # 헤더 (즉시 상태 업데이트)
     │   ├── Layout.js       # 레이아웃 래퍼
     │   └── SeatGrid.js     # 좌석 배치도
     ├── pages/              # 페이지 컴포넌트들
@@ -64,15 +95,15 @@ seat-management/
     │   │   ├── info.js     # 관리자 정보 관리
     │   │   ├── seats.js    # 좌석 관리 (3탭 구조)
     │   │   ├── timeslots.js # 시간 슬롯 관리
-    │   │   └── users.js    # 사용자 관리
+    │   │   └── users.js    # 사용자 관리 (초기 비밀번호 안내)
     │   ├── _app.js         # 앱 초기화
-    │   ├── index.js        # 메인 페이지
-    │   └── login.js        # 로그인 페이지
+    │   ├── index.js        # 메인 페이지 (비밀번호 변경 모달)
+    │   └── login.js        # 로그인 페이지 (비밀번호 필드)
     ├── public/             # 정적 파일들
     ├── styles/             # CSS 스타일
     ├── utils/              # 유틸리티 함수들
-    │   ├── api.js          # API 호출 함수들
-    │   ├── auth.js         # 인증 관련 함수들
+    │   ├── api.js          # API 호출 함수들 (쿠키 인증)
+    │   ├── auth.js         # 인증 관련 함수들 (서버 확인)
     │   ├── client-only.js  # 클라이언트 전용 컴포넌트
     │   └── timeUtils.js    # 시간 계산 유틸리티
     ├── .env.local          # 환경 변수 설정
@@ -100,9 +131,10 @@ npm install
 3. `.env` 파일 생성 및 환경 변수 설정
 ```
 PORT=5001
-MONGODB_URI=<your_mongodb_connection_string>
-JWT_SECRET=<your_jwt_secret_key>
-JWT_EXPIRE=30m
+MONGO_URI=<your_mongodb_connection_string>
+JWT_SECRET=<your_jwt_secret_key_minimum_32_chars>
+JWT_EXPIRE=30d
+JWT_COOKIE_EXPIRE=30
 NODE_ENV=development
 ```
 
@@ -124,7 +156,7 @@ npm install
 
 3. `.env.local` 파일 생성 및 환경 변수 설정
 ```
-NEXT_PUBLIC_API_URL=https://port-0-seat-management-mcdii4ecc60f3aad.sel5.cloudtype.app/api
+NEXT_PUBLIC_API_URL=http://localhost:5001/api
 ```
 
 4. 개발 서버 실행
@@ -135,13 +167,14 @@ npm run dev
 ## 📋 주요 기능
 
 ### 사용자 (학생)
-- **로그인 시스템**: 학번/수험번호와 이름으로 간편 로그인
-- **우선순위별 접근 제어**: 1~12순위별 차등 시간 배정
+- **🔐 보안 로그인**: 학번/수험번호 + 비밀번호 인증
+- **🗝️ 비밀번호 변경**: 메인 페이지에서 즉시 변경 가능
+- **⚡ 우선순위별 접근 제어**: 1~12순위별 차등 시간 배정
   - 1순위(수료생), 12순위(기타): 15:00부터 배정 종료까지
   - 2~11순위: 개별 배정 시간 + 15:00 이후 추가 접근
-- **실시간 좌석 배치도**: 501~510호 연구실 좌석 현황 확인
-- **좌석 신청/취소**: 클릭 한 번으로 간편한 좌석 관리
-- **세션 타임아웃**: 30분 비활성 시 자동 로그아웃 (5분 전 경고)
+- **🗺️ 실시간 좌석 배치도**: 501~510호 연구실 좌석 현황 확인
+- **🪑 좌석 신청/취소**: 클릭 한 번으로 간편한 좌석 관리
+- **🔒 안전한 세션**: HttpOnly 쿠키 기반 보안 세션
 
 ### 관리자
 #### 📊 대시보드
@@ -155,6 +188,7 @@ npm run dev
 - **좌석 목록 관리**: 테이블 형태 좌석 관리, Excel 다운로드
 
 #### 👥 사용자 관리
+- **🔐 초기 비밀번호**: 모든 사용자에게 "sg1234" 자동 할당
 - **CSV 일괄 업로드**: 드래그앤드롭으로 사용자 대량 등록
 - **템플릿 다운로드**: 한글 인코딩 지원 CSV 템플릿
 - **체크박스 선택**: 다중 선택을 통한 일괄 삭제
@@ -170,11 +204,14 @@ npm run dev
 - **로그인 페이지 연동**: 입력한 정보가 자동으로 로그인 페이지에 표시
 - **실시간 미리보기**: 변경사항 즉시 확인
 
-### 🔐 보안 기능
-- **JWT 기반 인증**: 안전한 토큰 기반 로그인
-- **관리자 권한 분리**: 일반 사용자와 관리자 권한 구분
-- **세션 관리**: 자동 로그아웃 및 보안 세션 유지
-- **CORS 보안**: 허용된 도메인만 API 접근 가능
+### 🔐 보안 기능 (강화)
+- **🛡️ bcrypt 비밀번호 해싱**: 안전한 비밀번호 저장
+- **🍪 HttpOnly 쿠키**: XSS 공격으로부터 토큰 보호
+- **🔒 CSRF 방어**: SameSite 쿠키 속성으로 보안 강화
+- **🚫 민감정보 로깅 차단**: 프로덕션에서 개인정보 보호
+- **🔑 서버 인증 확인**: 클라이언트 조작 불가능한 서버 검증
+- **⚡ 즉시 로그아웃**: 안전한 세션 종료
+- **👤 관리자 권한 분리**: 일반 사용자와 관리자 권한 구분
 
 ### 📱 반응형 디자인
 - **모바일 최적화**: 모든 기능이 모바일에서 완벽 작동
@@ -194,7 +231,7 @@ npm run dev
 ## 🚀 배포 환경
 
 ### 프로덕션 URL
-- **프론트엔드**: https://seat-management-el5wgnzgi-jaeho-chois-projects.vercel.app
+- **프론트엔드**: https://seat-management.vercel.app
 - **백엔드**: https://port-0-seat-management-mcdii4ecc60f3aad.sel5.cloudtype.app
 
 ### 환경 설정
@@ -202,9 +239,10 @@ npm run dev
 
 **백엔드 (CloudType)**:
 ```
-MONGODB_URI=mongodb+srv://...
-JWT_SECRET=your_secret_key
-JWT_EXPIRE=30m
+MONGO_URI=mongodb+srv://...
+JWT_SECRET=minimum_32_characters_secret_key
+JWT_EXPIRE=30d
+JWT_COOKIE_EXPIRE=30
 PORT=5001
 NODE_ENV=production
 ```
@@ -222,13 +260,12 @@ CloudType 무료 티어의 자동 슬립 문제를 해결하기 위한 **다중 
 - 자동으로 서버 상태 확인 및 Wake-up
 - GitHub 저장소에서 자동 실행
 
-
-#### 3. 클라이언트 자동 Wake-up 🟢
+#### 2. 클라이언트 자동 Wake-up 🟢
 - 사용자가 사이트 접속 시 자동으로 서버 깨우기
 - 탭 활성화 시 재시도
 - 4분마다 자동 Keep-alive ping
 
-#### 4. API 호출 전 Wake-up 🟢
+#### 3. API 호출 전 Wake-up 🟢
 - 중요한 API 호출 전 서버 상태 확인
 - 자동 재시도 로직 (3-5회)
 
@@ -238,14 +275,48 @@ CloudType 무료 티어의 자동 슬립 문제를 해결하기 위한 **다중 
 2. **클라이언트 Wake-up** (자동) - 사용자 경험 향상
 3. **API Wake-up** (자동) - 요청 실패 방지
 
+## 🔧 개발자 가이드
+
+### 새 사용자 추가 시
+1. **CSV 업로드**: 관리자 페이지에서 일괄 등록
+2. **초기 비밀번호**: 자동으로 "sg1234" 할당
+3. **사용자 안내**: 첫 로그인 후 비밀번호 변경 권장
+
+### 비밀번호 정책
+- **최소 길이**: 6자리 이상
+- **해시화**: bcrypt 자동 처리
+- **초기값**: "sg1234" (모든 사용자 공통)
+
+### 보안 고려사항
+- **쿠키 설정**: HttpOnly, Secure, SameSite 필수
+- **환경변수**: JWT_SECRET은 최소 32자리 이상
+- **로깅**: 프로덕션에서 민감정보 출력 금지
+- **CORS**: 허용된 도메인만 접근 가능
+
+## 📊 보안 강화 전후 비교
+
+| 항목 | 기존 시스템 | 보안 강화 시스템 |
+|------|-------------|------------------|
+| 인증 방식 | 학번 + 이름 | 학번 + bcrypt 비밀번호 |
+| 토큰 저장 | localStorage | HttpOnly Cookie |
+| 인증 확인 | 클라이언트 | 서버 API (/auth/me) |
+| XSS 방어 | ❌ | ✅ (HttpOnly) |
+| CSRF 방어 | ❌ | ✅ (SameSite) |
+| 민감정보 로깅 | 모든 환경 | 개발환경만 |
+| 로그아웃 | 토큰 삭제 | 서버 쿠키 무효화 |
+| 비밀번호 변경 | ❌ | ✅ (즉시 변경) |
 
 ## 👨‍💻 개발자
 
 **최재호** (Jaeho Choi) AI finLab
 - 서강대학교 경제학과 대학원 연구실 자리 배정 시스템 개발
-- Email: [wogh1217@sogang.ac.kr]
-
+- 보안 강화 및 사용자 경험 개선
+- Email: wogh1217@sogang.ac.kr
 
 ## 📄 라이센스
 
-이 프로젝트는 MIT 라이센스를 따릅니다. 
+이 프로젝트는 MIT 라이센스를 따릅니다.
+
+---
+
+**🔐 보안이 강화된 안전한 연구실 자리 배정 시스템입니다.**
