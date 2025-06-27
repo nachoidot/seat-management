@@ -23,13 +23,15 @@ if (process.env.NODE_ENV === 'development') {
 app.use(cors({
   origin: origins,
   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  allowedHeaders: ['Content-Type','Authorization','Cache-Control','X-Requested-With'],
   credentials: true,
 }));
 
 // preflight(OPTIONS) 요청도 CORS 적용
 app.options('*', cors({
   origin: origins,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','Cache-Control','X-Requested-With'],
   credentials: true
 }));
 

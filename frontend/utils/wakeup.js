@@ -26,23 +26,15 @@ export const wakeUpServer = async (maxRetries = 5) => {
   
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15초 타임아웃
-      
-      const response = await fetch(`${API_URL}/health`, {
-        method: 'GET',
-        signal: controller.signal,
+      const response = await axios.get(`${API_URL}/health`, {
+        timeout: 15000, // 15초 타임아웃
         headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Content-Type': 'application/json'
         }
       });
       
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`✅ 서버 깨우기 성공! (시도 ${i + 1}/${maxRetries})`, data.message);
+      if (response.status === 200 && response.data) {
+        console.log(`✅ 서버 깨우기 성공! (시도 ${i + 1}/${maxRetries})`, response.data.message);
         return true;
       }
     } catch (error) {
