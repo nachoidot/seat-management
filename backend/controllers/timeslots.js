@@ -51,7 +51,9 @@ exports.getTimeSlot = async (req, res) => {
 // @access  Private (Admin only)
 exports.createTimeSlot = async (req, res) => {
   try {
-    console.log('일정 추가 요청 시작:', req.body);
+    if (process.env.NODE_ENV === 'development') {
+    console.log('일정 추가 요청 시작');
+  }
     
     // 데이터 검증 단계 추가
     if (!req.body.title || !req.body.baseDate || !req.body.endDate) {
@@ -66,31 +68,15 @@ exports.createTimeSlot = async (req, res) => {
       });
     }
     
-    // 날짜 형식 확인
-    console.log('날짜 형식 확인:', {
-      baseDate: req.body.baseDate,
-      endDate: req.body.endDate,
-      baseDateType: typeof req.body.baseDate,
-      endDateType: typeof req.body.endDate
-    });
-    
-    try {
-      // 날짜 파싱 시도
-      const baseDate = new Date(req.body.baseDate);
-      const endDate = new Date(req.body.endDate);
-      console.log('파싱된 날짜:', {
-        baseDate: baseDate.toISOString(),
-        endDate: endDate.toISOString(),
-        isValidBaseDate: !isNaN(baseDate.getTime()),
-        isValidEndDate: !isNaN(endDate.getTime())
-      });
-    } catch (parseErr) {
-      console.error('날짜 파싱 오류:', parseErr);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('날짜 형식 검증 중...');
     }
     
-    console.log('TimeSlot.create 호출 직전');
     const timeSlot = await TimeSlot.create(req.body);
-    console.log('생성된 일정:', timeSlot);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('일정 생성 완료');
+    }
 
     res.status(201).json({
       success: true,
@@ -159,11 +145,16 @@ exports.updateTimeSlot = async (req, res) => {
 // @access  Private (Admin only)
 exports.deleteTimeSlot = async (req, res) => {
   try {
-    console.log(`일정 삭제 요청: ID ${req.params.id}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('일정 삭제 요청');
+    }
+    
     const timeSlot = await TimeSlot.findById(req.params.id);
 
     if (!timeSlot) {
-      console.log(`ID ${req.params.id}에 해당하는 일정을 찾을 수 없음`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('일정을 찾을 수 없음');
+      }
       return res.status(404).json({
         success: false,
         message: `Time slot not found with id of ${req.params.id}`
@@ -172,7 +163,10 @@ exports.deleteTimeSlot = async (req, res) => {
 
     // remove() 대신 deleteOne() 사용 (최신 Mongoose 버전 호환)
     await TimeSlot.deleteOne({ _id: req.params.id });
-    console.log(`ID ${req.params.id} 일정 삭제 성공`);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('일정 삭제 성공');
+    }
 
     res.status(200).json({
       success: true,

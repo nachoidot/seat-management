@@ -38,28 +38,11 @@ app.use(cookieParser());
 
 // 개발 환경에서만 상세 로깅
 if (process.env.NODE_ENV === 'development') {
-  // 요청 로깅 미들웨어 (개발 환경에서만)
+  // 요청 로깅 미들웨어 (개발 환경에서만 - 민감정보 제외)
   app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    console.log('요청 헤더:', JSON.stringify(req.headers, null, 2));
     
-    // req.body가 존재하는지 먼저 확인
-    if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
-      console.log('요청 본문:', JSON.stringify(req.body, null, 2));
-    }
-    
-    // 응답 로깅
-    const originalSend = res.send;
-    res.send = function(body) {
-      console.log(`[${new Date().toISOString()}] 응답 상태코드: ${res.statusCode}`);
-      // 응답 본문이 너무 크면 축약
-      if (body && typeof body === 'string' && body.length > 200) {
-        console.log('응답 본문 (축약):', body.substring(0, 200) + '...');
-      } else {
-        console.log('응답 본문:', body);
-      }
-      return originalSend.call(this, body);
-    };
+    // 민감정보가 포함될 수 있는 헤더와 본문은 로깅하지 않음
     
     next();
   });
@@ -107,7 +90,7 @@ mongoose.connect(mongoUri, mongooseOptions)
           if (count > 0) {
             return mongoose.connection.db.collection('timeslots').find({}).limit(2).toArray()
               .then(samples => {
-                console.log('TimeSlots 샘플:', samples);
+                console.log('TimeSlots 샘플 수:', samples.length);
               });
           }
         });
@@ -131,7 +114,7 @@ mongoose.connect(mongoUri, mongooseOptions)
   })
   .then(users => {
     if (process.env.NODE_ENV === 'development' && users.length > 0) {
-      console.log('사용자 데이터 샘플 (ID만):', users.map(u => u.studentId));
+      console.log('사용자 데이터 수:', users.length);
     }
   })
   .catch(err => {
