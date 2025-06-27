@@ -6,9 +6,9 @@ const User = require('../models/User');
 // @access  Public
 exports.login = async (req, res) => {
   try {
-    const { studentId, name, password, birthdate } = req.body;
+    const { studentId, name, password } = req.body;
     
-    // 검증 - password는 필수, 생년월일은 선택사항
+    // 검증
     if (!studentId || !name || !password) {
       return res.status(400).json({
         success: false,
@@ -41,16 +41,6 @@ exports.login = async (req, res) => {
         success: false,
         message: 'Invalid credentials'
       });
-    }
-
-    // 생년월일이 제공된 경우에만 확인 (기존 사용자 호환성)
-    if (birthdate && user.birthdate && user.birthdate.trim() !== '') {
-      if (user.birthdate !== birthdate) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials'
-        });
-      }
     }
 
     // 로그인 성공

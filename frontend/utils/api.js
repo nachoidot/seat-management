@@ -75,12 +75,11 @@ const makeRequestWithDeduplication = async (key, requestFn) => {
 };
 
 // Authentication API calls
-export const login = async (studentId, name, password, birthdate = '') => {
+export const login = async (studentId, name, password) => {
   const response = await api.post('/auth/login', {
     studentId,
     name,
-    password,
-    birthdate
+    password
   });
   return response.data;
 };

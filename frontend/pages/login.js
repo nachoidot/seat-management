@@ -9,8 +9,7 @@ export default function Login() {
   const [formData, setFormData] = useState({
     studentId: '',
     name: '',
-    password: '',
-    birthdate: ''
+    password: ''
   });
   const [loading, setLoading] = useState(false);
   const [adminInfo, setAdminInfo] = useState(null);
@@ -66,8 +65,7 @@ export default function Login() {
       const response = await login(
         formData.studentId, 
         formData.name, 
-        formData.password, 
-        formData.birthdate
+        formData.password
       );
       
       if (response.success) {
@@ -147,7 +145,7 @@ export default function Login() {
                 />
               </div>
 
-              <div className="mb-4">
+              <div className="mb-6">
                 <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">
                   비밀번호 *
                 </label>
@@ -161,24 +159,6 @@ export default function Login() {
                   placeholder="비밀번호를 입력하세요"
                   required
                 />
-              </div>
-
-              <div className="mb-6">
-                <label htmlFor="birthdate" className="block text-gray-700 text-sm font-bold mb-2">
-                  생년월일 (선택사항)
-                </label>
-                <input
-                  type="text"
-                  id="birthdate"
-                  name="birthdate"
-                  value={formData.birthdate}
-                  onChange={handleChange}
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                  placeholder="YYYYMMDD 형식 (예: 19990101)"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  생년월일은 추가 보안을 위한 선택사항입니다.
-                </p>
               </div>
               
               <div className="flex items-center justify-between">
