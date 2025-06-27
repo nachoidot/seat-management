@@ -2,17 +2,12 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 import '../styles/globals.css';
-import { useSessionTimeout, isAuthenticated } from '../utils/auth';
 import { autoWakeUpOnLoad, startKeepAlive } from '../utils/wakeup';
 
 // 클라이언트에서만 렌더링되는 앱 컴포넌트
 const ClientOnlyApp = ({ Component, pageProps }) => {
   const router = useRouter();
-  
-  // 세션 타임아웃 훅 사용
-  useSessionTimeout();
 
   useEffect(() => {
     // Add event listener to fix "ResizeObserver loop limit exceeded" error
@@ -44,7 +39,6 @@ const ClientOnlyApp = ({ Component, pageProps }) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
       <Component {...pageProps} />
-      <SpeedInsights />
     </>
   );
 };
