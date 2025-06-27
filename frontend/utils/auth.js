@@ -37,6 +37,7 @@ export const logout = async (isAutoLogout = false) => {
   try {
     // 서버에서 쿠키 삭제
     await apiLogout();
+    console.log('Logout API called successfully');
   } catch (error) {
     // 서버 호출 실패해도 클라이언트에서 로그아웃 진행
     console.error('Logout API call failed:', error);
@@ -45,6 +46,15 @@ export const logout = async (isAutoLogout = false) => {
   // 자동 로그아웃 시 알림
   if (isAutoLogout) {
     alert('보안을 위해 세션이 만료되어 자동 로그아웃됩니다.');
+  }
+  
+  // 캐시 클리어 (선택사항)
+  if ('caches' in window) {
+    caches.keys().then(names => {
+      names.forEach(name => {
+        caches.delete(name);
+      });
+    });
   }
   
   // Redirect to login page

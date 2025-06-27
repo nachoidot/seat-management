@@ -21,11 +21,16 @@ const Header = () => {
     loadUser();
   }, [isClient]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (!isClient) return;
     
     if (confirm('정말 로그아웃 하시겠습니까?')) {
-      logout();
+      // 상태 즉시 업데이트
+      setUser(null);
+      setIsOpen(false);
+      
+      // 로그아웃 처리
+      await logout();
     }
   };
 
