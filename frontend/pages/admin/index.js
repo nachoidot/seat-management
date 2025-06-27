@@ -37,118 +37,87 @@ export default function AdminDashboard() {
   const loadData = async () => {
     try {
       setLoading(true);
-      console.log('관리자 대시보드 데이터 로드 시작...');
       
-      const [usersRes, seatsRes, timeslotsRes] = await Promise.all([
+      // 각 API 병렬 호출
+      const [usersRes, seatsRes, timeslotsRes] = await Promise.allSettled([
         getUsers().catch(err => {
           console.error('사용자 데이터 로드 실패:', err);
-          return { success: false, data: { data: [] } };
+          return { data: [] };
         }),
         getSeats().catch(err => {
           console.error('좌석 데이터 로드 실패:', err);
-          return { success: false, data: { data: [] } };
+          return { data: [] };
         }),
         getTimeSlots().catch(err => {
           console.error('일정 데이터 로드 실패:', err);
-          return { success: false, data: { data: [] } };
+          return { data: [] };
         })
       ]);
 
-      console.log('API 응답 구조:');
-      console.log('Users:', usersRes);
-      console.log('Seats:', seatsRes);
-      console.log('TimeSlots:', timeslotsRes);
-
-      // 데이터 추출 - API 응답 구조에 맞게 처리
+      // 각 API 응답에서 데이터 추출
       let users = [];
       let seats = [];
       let timeslots = [];
 
-      // 사용자 데이터 처리 (권한 에러 시 무시)
-      if (usersRes?.success !== false) {
-        if (usersRes?.data?.data && Array.isArray(usersRes.data.data)) {
-          users = usersRes.data.data;
-        } else if (usersRes?.data && Array.isArray(usersRes.data)) {
-          users = usersRes.data;
+      // 사용자 데이터 처리
+      if (usersRes.status === 'fulfilled') {
+        try {
+          if (usersRes.value && usersRes.value.data) {
+            users = usersRes.value.data;
+          } else if (usersRes.value && Array.isArray(usersRes.value)) {
+            users = usersRes.value;
+          }
+        } catch (err) {
+          console.warn('사용자 데이터에 접근할 수 없습니다 (권한 문제)');
+          users = [];
         }
-      } else {
-        console.warn('사용자 데이터에 접근할 수 없습니다 (권한 문제)');
       }
 
       // 좌석 데이터 처리  
-      if (seatsRes?.success !== false) {
-        if (seatsRes?.data?.data && Array.isArray(seatsRes.data.data)) {
-          seats = seatsRes.data.data;
-        } else if (seatsRes?.data && Array.isArray(seatsRes.data)) {
-          seats = seatsRes.data;
+      if (seatsRes.status === 'fulfilled') {
+        if (seatsRes.value && seatsRes.value.data) {
+          seats = seatsRes.value.data;
+        } else if (seatsRes.value && Array.isArray(seatsRes.value)) {
+          seats = seatsRes.value;
         }
       }
 
       // 일정 데이터 처리
-      if (timeslotsRes?.success !== false) {
-        if (timeslotsRes?.data?.data && Array.isArray(timeslotsRes.data.data)) {
-          timeslots = timeslotsRes.data.data;
-        } else if (timeslotsRes?.data && Array.isArray(timeslotsRes.data)) {
-          timeslots = timeslotsRes.data;
+      if (timeslotsRes.status === 'fulfilled') {
+        if (timeslotsRes.value && timeslotsRes.value.data) {
+          timeslots = timeslotsRes.value.data;
+        } else if (timeslotsRes.value && Array.isArray(timeslotsRes.value)) {
+          timeslots = timeslotsRes.value;
         }
       }
 
-      console.log('처리된 데이터:');
-      console.log('Users count:', users.length);
-      console.log('Seats count:', seats.length);
-      console.log('TimeSlots count:', timeslots.length);
-      
-      // 실제 좌석만 필터링 (obj- 접두사가 없는 좌석들)
-      const actualSeats = seats.filter(seat => !seat.seatId.includes('obj-'));
-      const assignedSeats = actualSeats.filter(seat => seat.assignedTo);
-      const confirmedSeats = assignedSeats.filter(seat => seat.confirmed);
-      const availableSeats = actualSeats.filter(seat => !seat.assignedTo);
-      
-      // 좌석 유형별 통계
-      const seatsByType = { 석사: 0, 박사: 0 };
-      actualSeats.forEach(seat => {
-        if (seat.type === '석사') seatsByType.석사++;
-        else if (seat.type === '박사') seatsByType.박사++;
+      // 데이터 검증 및 기본값 설정
+      const validUsers = Array.isArray(users) ? users : [];
+      const validSeats = Array.isArray(seats) ? seats : [];
+      const validTimeslots = Array.isArray(timeslots) ? timeslots : [];
+
+      // 상태 업데이트
+      setStats({
+        totalSeats: validSeats.length,
+        assignedSeats: validSeats.filter(seat => seat.assignedTo).length,
+        confirmedSeats: validSeats.filter(seat => seat.confirmed).length,
+        availableSeats: validSeats.filter(seat => !seat.assignedTo).length,
+        totalUsers: validUsers.length,
+        totalTimeSlots: validTimeslots.length,
+        seatsByType: validSeats.reduce((acc, seat) => {
+          const type = seat.type || '미분류';
+          acc[type] = (acc[type] || 0) + 1;
+          return acc;
+        }, {}),
+        seatsByRoom: validSeats.reduce((acc, seat) => {
+          const room = seat.roomNumber || '미분류';
+          acc[room] = (acc[room] || 0) + 1;
+          return acc;
+        }, {}),
+        assignmentRate: validSeats.length > 0 ? Math.round((validSeats.filter(seat => seat.assignedTo).length / validSeats.length) * 100) : 0,
+        confirmationRate: validSeats.length > 0 ? Math.round((validSeats.filter(seat => seat.confirmed).length / validSeats.length) * 100) : 0
       });
-      
-      // 방별 통계
-      const seatsByRoom = {};
-      actualSeats.forEach(seat => {
-        const room = seat.roomNumber;
-        if (!seatsByRoom[room]) {
-          seatsByRoom[room] = { total: 0, assigned: 0, confirmed: 0 };
-        }
-        seatsByRoom[room].total++;
-        if (seat.assignedTo) seatsByRoom[room].assigned++;
-        if (seat.confirmed) seatsByRoom[room].confirmed++;
-      });
-      
-      // 비율 계산
-      const assignmentRate = actualSeats.length > 0 ? Math.round((assignedSeats.length / actualSeats.length) * 100) : 0;
-      const confirmationRate = assignedSeats.length > 0 ? Math.round((confirmedSeats.length / assignedSeats.length) * 100) : 0;
-      
-      console.log('좌석 통계:');
-      console.log('전체 좌석:', actualSeats.length);
-      console.log('배정된 좌석:', assignedSeats.length);
-      console.log('확정된 좌석:', confirmedSeats.length);
-      console.log('유형별 좌석:', seatsByType);
-      console.log('방별 좌석:', seatsByRoom);
-      
-      const newStats = {
-        totalSeats: actualSeats.length,
-        assignedSeats: assignedSeats.length,
-        confirmedSeats: confirmedSeats.length,
-        availableSeats: availableSeats.length,
-        totalUsers: users.length,
-        totalTimeSlots: timeslots.length,
-        seatsByType,
-        seatsByRoom,
-        assignmentRate,
-        confirmationRate
-      };
-      
-      console.log('최종 통계:', newStats);
-      setStats(newStats);
+
     } catch (error) {
       console.error('데이터 로드 오류:', error);
       toast.error('데이터를 불러오는 중 오류가 발생했습니다.');

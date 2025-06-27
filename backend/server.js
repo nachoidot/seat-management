@@ -3,6 +3,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
+const logger = require('./utils/logger');
 
 // Load environment variables
 dotenv.config();
@@ -16,7 +17,7 @@ const origins = [
 ].filter(Boolean); // undefined 값 제거
 
 if (process.env.NODE_ENV === 'development') {
-  console.log('허용된 CORS Origins:', origins);
+  logger.debug('허용된 CORS Origins', { origins });
 }
 
 app.use(cors({
@@ -36,25 +37,15 @@ app.options('*', cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// 개발 환경에서만 상세 로깅
-if (process.env.NODE_ENV === 'development') {
-  // 요청 로깅 미들웨어 (개발 환경에서만 - 민감정보 제외)
-  app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    
-    // 민감정보가 포함될 수 있는 헤더와 본문은 로깅하지 않음
-    
-    next();
-  });
-}
+// HTTP 요청 로깅 미들웨어 (winston)
+app.use(logger.logRequest);
 
 // Database connection
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/seatmgmt';
 
-if (process.env.NODE_ENV === 'development') {
-  console.log('MongoDB 연결 시도... 문자열 (민감한 정보 일부 가림):', 
-    mongoUri.replace(/:([^:@]+)@/, ':****@'));
-}
+logger.info('MongoDB 연결 시도', { 
+  uri: mongoUri.replace(/:([^:@]+)@/, ':****@') // 비밀번호 마스킹
+});
 
 // 연결 옵션 명시적 설정
 const mongooseOptions = {
@@ -65,46 +56,42 @@ const mongooseOptions = {
 
 mongoose.connect(mongoUri, mongooseOptions)
   .then(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('MongoDB 연결 성공!');
-      console.log('데이터베이스 이름:', mongoose.connection.db.databaseName);
-    }
+    logger.info('MongoDB 연결 성공', { 
+      database: mongoose.connection.db.databaseName 
+    });
     // 모든 컬렉션 이름 출력
     return mongoose.connection.db.listCollections().toArray();
   })
   .then(collections => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('컬렉션 목록:', collections.map(c => c.name));
-    }
+    const collectionNames = collections.map(c => c.name);
+    logger.debug('데이터베이스 컬렉션 목록', { collections: collectionNames });
     
     // timeslots 컬렉션 생성 확인
     const hasTimeslotsCollection = collections.some(c => c.name === 'timeslots');
-    if (!hasTimeslotsCollection && process.env.NODE_ENV === 'development') {
-      console.log('timeslots 컬렉션이 없습니다. 첫 번째 일정이 추가되면 자동 생성될 것입니다.');
-    } else if (hasTimeslotsCollection && process.env.NODE_ENV === 'development') {
-      console.log('timeslots 컬렉션이 이미 존재합니다.');
+    if (!hasTimeslotsCollection) {
+      logger.info('timeslots 컬렉션이 없습니다. 첫 번째 일정이 추가되면 자동 생성될 것입니다.');
+    } else {
+      logger.debug('timeslots 컬렉션이 이미 존재합니다.');
       // timeslots 컬렉션 데이터 확인
       return mongoose.connection.db.collection('timeslots').countDocuments()
         .then(count => {
-          console.log('TimeSlots 컬렉션 문서 수:', count);
+          logger.debug('TimeSlots 컬렉션 문서 수', { count });
           if (count > 0) {
             return mongoose.connection.db.collection('timeslots').find({}).limit(2).toArray()
               .then(samples => {
-                console.log('TimeSlots 샘플 수:', samples.length);
+                logger.debug('TimeSlots 샘플 조회 완료', { sampleCount: samples.length });
               });
           }
         });
     }
   })
   .then(() => {
-    // 개발 환경에서만 User 컬렉션 데이터 확인
-    if (process.env.NODE_ENV === 'development') {
-      return mongoose.connection.db.collection('users').countDocuments();
-    }
+    // User 컬렉션 데이터 확인
+    return mongoose.connection.db.collection('users').countDocuments();
   })
   .then(count => {
-    if (process.env.NODE_ENV === 'development' && count !== undefined) {
-      console.log('Users 컬렉션 문서 수:', count);
+    if (count !== undefined) {
+      logger.debug('Users 컬렉션 문서 수', { count });
       // 간단한 사용자 조회 테스트
       if (count > 0) {
         return mongoose.connection.db.collection('users').find({}).toArray();
@@ -113,15 +100,15 @@ mongoose.connect(mongoUri, mongooseOptions)
     return [];
   })
   .then(users => {
-    if (process.env.NODE_ENV === 'development' && users.length > 0) {
-      console.log('사용자 데이터 수:', users.length);
+    if (users.length > 0) {
+      logger.debug('사용자 데이터 로드 완료', { userCount: users.length });
     }
   })
   .catch(err => {
-    console.error('MongoDB 연결 오류:', err.message);
-    if (process.env.NODE_ENV === 'development') {
-      console.error('스택 트레이스:', err.stack);
-    }
+    logger.error('MongoDB 연결 오류', {
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   });
 
 // Import Routes
@@ -144,18 +131,27 @@ if (process.env.NODE_ENV === 'development') {
       const usersCount = await mongoose.connection.db.collection('users').countDocuments();
       const seatsCount = await mongoose.connection.db.collection('seats').countDocuments();
       const timeslotsCount = await mongoose.connection.db.collection('timeslots').countDocuments();
+      const collections = await mongoose.connection.db.listCollections().toArray().then(cols => cols.map(c => c.name));
+      
+      const stats = {
+        usersCount,
+        seatsCount,
+        timeslotsCount,
+        dbName: mongoose.connection.db.databaseName,
+        collections
+      };
+      
+      logger.debug('데이터베이스 통계 조회', stats);
       
       return res.status(200).json({
         success: true,
-        stats: {
-          usersCount,
-          seatsCount,
-          timeslotsCount,
-          dbName: mongoose.connection.db.databaseName,
-          collections: await mongoose.connection.db.listCollections().toArray().then(cols => cols.map(c => c.name))
-        }
+        stats
       });
     } catch (err) {
+      logger.error('데이터 통계 조회 중 오류', {
+        message: err.message,
+        url: req.url
+      });
       return res.status(500).json({
         success: false,
         message: '데이터 통계 조회 중 오류가 발생했습니다.',
@@ -172,6 +168,11 @@ app.get('/', (req, res) => {
 
 // 404 에러 핸들러 (존재하지 않는 경로)
 app.use((req, res) => {
+  logger.warn('404 Not Found', {
+    method: req.method,
+    url: req.url,
+    ip: req.ip
+  });
   res.status(404).json({
     success: false,
     message: '요청한 경로를 찾을 수 없습니다'
@@ -180,7 +181,7 @@ app.use((req, res) => {
 
 // 전역 에러 핸들러
 app.use((err, req, res, next) => {
-  console.error('서버 오류:', err.message);
+  logger.logError(err, req);
   res.status(500).json({
     success: false,
     message: '서버 내부 오류가 발생했습니다',
@@ -191,5 +192,5 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
+  logger.info('서버 시작 완료', { port: PORT, environment: process.env.NODE_ENV });
 }); 

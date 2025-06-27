@@ -1,6 +1,7 @@
 const Seat = require('../models/Seat');
 const User = require('../models/User');
 const TimeSlot = require('../models/TimeSlot');
+const logger = require('../utils/logger');
 
 // @desc    Get all seats
 // @route   GET /api/seats
@@ -23,7 +24,7 @@ exports.getSeats = async (req, res) => {
       data: seats
     });
   } catch (err) {
-    console.error('Error fetching seats:', err);
+    logger.logError(err, req);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -68,7 +69,7 @@ exports.getSeat = async (req, res) => {
       data: seat
     });
   } catch (err) {
-    console.error('Error fetching seat:', err);
+    logger.logError(err, req);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -270,7 +271,7 @@ exports.assignSeat = async (req, res) => {
       data: seat
     });
   } catch (err) {
-    console.error('Error assigning seat:', err);
+    logger.logError(err, req);
     
     // MongoDB duplicate key error (사용자가 이미 다른 좌석을 보유한 경우)
     if (err.code === 11000 && err.keyPattern?.assignedTo) {
@@ -332,7 +333,7 @@ exports.unassignSeat = async (req, res) => {
       data: seat
     });
   } catch (err) {
-    console.error('Error unassigning seat:', err);
+    logger.logError(err, req);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -385,7 +386,7 @@ exports.confirmSeat = async (req, res) => {
       data: seat
     });
   } catch (err) {
-    console.error('Error confirming seat:', err);
+    logger.logError(err, req);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -461,7 +462,7 @@ exports.adminAssignSeat = async (req, res) => {
       data: seat
     });
   } catch (err) {
-    console.error('Error admin assigning seat:', err);
+    logger.logError(err, req);
     res.status(500).json({
       success: false,
       message: 'Server error',

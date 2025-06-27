@@ -2,6 +2,7 @@ const Seat = require('../models/Seat');
 const User = require('../models/User');
 const AdminInfo = require('../models/AdminInfo');
 const XLSX = require('xlsx');
+const logger = require('../utils/logger');
 
 // 입력값 검증 헬퍼 함수들
 const validateStudentId = (studentId) => {
@@ -62,7 +63,7 @@ const getAdminInfoFromDB = async () => {
     
     return adminInfo;
   } catch (error) {
-    console.error('Error getting admin info from DB:', error);
+    logger.logError('Error getting admin info from DB:', error);
     // DB 오류 시 기본값 반환
     return {
       name: '관리자',
@@ -88,7 +89,7 @@ exports.getUsers = async (req, res) => {
       data: users
     });
   } catch (err) {
-    console.error('Error fetching users:', err);
+    logger.logError('Error fetching users:', err);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -150,7 +151,7 @@ exports.createUser = async (req, res) => {
       data: user
     });
   } catch (err) {
-    console.error('Error creating user:', err);
+    logger.logError('Error creating user:', err);
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors).map(val => val.message);
       return res.status(400).json({
@@ -313,7 +314,7 @@ exports.getSeats = async (req, res) => {
       data: seats
     });
   } catch (err) {
-    console.error('Error getting seats:', err);
+    logger.logError('Error getting seats:', err);
     res.status(500).json({
       success: false,
       message: 'Server error'
@@ -339,7 +340,7 @@ exports.resetAllSeats = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Error resetting seats:', err);
+    logger.logError('Error resetting seats:', err);
     res.status(500).json({
       success: false,
       message: 'Server error'
@@ -492,7 +493,7 @@ exports.createBatchSeats = async (req, res) => {
         message: 'Duplicate seat IDs detected'
       });
     } else {
-      console.error('Error creating batch seats:', err);
+      logger.logError('Error creating batch seats:', err);
       res.status(500).json({
         success: false,
         message: 'Server error'
@@ -608,7 +609,7 @@ exports.bulkCreateUsers = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Bulk user creation error:', err);
+    logger.logError('Bulk user creation error:', err);
     if (err.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -693,7 +694,7 @@ exports.bulkConfirmSeats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error bulk confirming seats:', error);
+    logger.logError('Error bulk confirming seats:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -748,7 +749,7 @@ exports.getSeatAssignmentStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting seat assignment stats:', error);
+    logger.logError('Error getting seat assignment stats:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -823,7 +824,7 @@ exports.bulkDeleteUsers = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error bulk deleting users:', error);
+    logger.logError('Error bulk deleting users:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -844,7 +845,7 @@ exports.getAdminInfo = async (req, res) => {
       data: adminInfo
     });
   } catch (err) {
-    console.error('Error fetching admin info:', err);
+    logger.logError('Error fetching admin info:', err);
     res.status(500).json({
       success: false,
       message: 'Server error'
@@ -910,7 +911,7 @@ exports.updateAdminInfo = async (req, res) => {
       data: adminInfo
     });
   } catch (err) {
-    console.error('Error updating admin info:', err);
+    logger.logError('Error updating admin info:', err);
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors).map(val => val.message);
       return res.status(400).json({

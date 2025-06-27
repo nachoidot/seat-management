@@ -1,5 +1,20 @@
+import axios from 'axios';
+
 // 서버 Wake-up 유틸리티
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+// 개발환경에서만 로그 출력
+const log = (message, ...args) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(message, ...args);
+  }
+};
+
+const logError = (message, ...args) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(message, ...args);
+  }
+};
 
 /**
  * 서버가 잠들어 있는지 확인하고 깨우기
@@ -49,14 +64,43 @@ export const wakeUpServer = async (maxRetries = 5) => {
 /**
  * API 요청 전에 서버 상태 확인 및 Wake-up
  */
-export const ensureServerAwake = async () => {
-  const serverWoken = await wakeUpServer(3);
-  
-  if (!serverWoken) {
+export const ensureServerAwake = async (maxRetries = 3) => {
+  if (!API_URL) {
+    return true; // API URL이 없으면 로컬 환경으로 간주
+  }
+
+  log('🤖 서버 Wake-up 시도 중...');
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await axios.get(`${API_URL}/health`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.status === 200 && response.data) {
+        const data = response.data;
+        log(`✅ 서버 깨우기 성공! (시도 ${i + 1}/${maxRetries})`, data.message);
+        return true;
+      }
+    } catch (error) {
+      logError(`⏰ 서버 Wake-up 시도 ${i + 1}/${maxRetries} 실패:`, error.message);
+      
+      if (i < maxRetries - 1) {
+        const waitTime = Math.min(1000 * Math.pow(2, i), 5000);
+        log(`🔄 ${waitTime}ms 후 재시도...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.warn('❌ 서버 Wake-up 실패. 서버가 응답하지 않습니다.');
     console.warn('⚠️ 서버가 응답하지 않습니다. 요청이 느려질 수 있습니다.');
   }
-  
-  return serverWoken;
+  return false;
 };
 
 /**
@@ -85,33 +129,52 @@ export const autoWakeUpOnLoad = () => {
 };
 
 /**
- * 주기적 Keep-Alive (클라이언트 사이드)
+ * 페이지 로드 시 서버 깨우기
  */
-export const startKeepAlive = (intervalMinutes = 4) => {
-  if (typeof window === 'undefined') return null;
+export const wakeupOnPageLoad = async () => {
+  try {
+    await ensureServerAwake();
+    log('🚀 페이지 로드 시 서버 Wake-up 완료');
+  } catch (error) {
+    // 무시 - 페이지 로드 시에는 실패해도 계속 진행
+  }
+};
+
+/**
+ * 탭 활성화 시 서버 깨우기
+ */
+export const wakeupOnFocus = async () => {
+  try {
+    await ensureServerAwake(1); // 한 번만 시도
+    log('👁️ 탭 활성화 시 서버 Wake-up 완료');
+  } catch (error) {
+    // 무시 - 포커스 시에는 실패해도 계속 진행
+  }
+};
+
+// Keep-alive 시스템
+let keepAliveInterval = null;
+
+const pingServer = async () => {
+  try {
+    await axios.get(`${API_URL}/health`, { timeout: 5000 });
+    log('💓 Keep-alive ping 성공');
+  } catch (error) {
+    logError('💔 Keep-alive ping 실패:', error.message);
+  }
+};
+
+export const startKeepAlive = (intervalMinutes = 10) => {
+  if (!API_URL || keepAliveInterval) return;
   
-  const interval = setInterval(async () => {
-    try {
-      const response = await fetch(`${API_URL}/health`, {
-        method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
-      });
-      
-      if (response.ok) {
-        console.log('💓 Keep-alive ping 성공');
-      }
-    } catch (error) {
-      console.log('💔 Keep-alive ping 실패:', error.message);
-    }
-  }, intervalMinutes * 60 * 1000);
-  
-  console.log(`🕐 Keep-alive 시작 (${intervalMinutes}분 간격)`);
-  
-  // cleanup 함수 반환
-  return () => {
-    clearInterval(interval);
-    console.log('🛑 Keep-alive 중지');
-  };
+  log(`🕐 Keep-alive 시작 (${intervalMinutes}분 간격)`);
+  keepAliveInterval = setInterval(pingServer, intervalMinutes * 60 * 1000);
+};
+
+export const stopKeepAlive = () => {
+  if (keepAliveInterval) {
+    log('🛑 Keep-alive 중지');
+    clearInterval(keepAliveInterval);
+    keepAliveInterval = null;
+  }
 }; 

@@ -62,43 +62,33 @@ export default function AdminTimeSlots() {
   }
 
   const loadTimeSlots = async () => {
-    console.log('loadTimeSlots 시작');
     try {
       setLoading(true);
-      console.log('API 호출 전');
+      
       const response = await getTimeSlots();
-      console.log('API 호출 후 응답:', response);
       
-      // API 응답 구조 확인하여 적절한 데이터 추출
+      // API 응답 구조에 따른 데이터 추출
       let timeSlotsData = [];
-      
-      if (response && response.success && Array.isArray(response.data)) {
-        // 응답이 {success, count, data} 구조인 경우
-        console.log('응답 구조 1: {success, count, data}');
+      if (response && response.success && response.data) {
+        // 응답 구조 1: {success, count, data}
         timeSlotsData = response.data;
-      } else if (response && Array.isArray(response.data)) {
-        // 응답이 {data: Array} 구조인 경우
-        console.log('응답 구조 2: {data: Array}');
+      } else if (response && response.data && Array.isArray(response.data)) {
+        // 응답 구조 2: {data: Array}
         timeSlotsData = response.data;
-      } else if (Array.isArray(response)) {
-        // 응답이 직접 배열인 경우
-        console.log('응답 구조 3: 직접 배열');
+      } else if (response && Array.isArray(response)) {
+        // 응답 구조 3: 직접 배열
         timeSlotsData = response;
       } else {
-        console.log('지원되지 않는 응답 구조:', response);
+        console.warn('지원되지 않는 응답 구조:', response);
         timeSlotsData = [];
       }
-      
-      console.log('설정할 최종 데이터:', timeSlotsData);
+
       setTimeSlots(timeSlotsData);
-      console.log('상태 업데이트 후');
     } catch (error) {
       console.error('일정 로드 오류:', error);
       toast.error('일정 정보를 불러오는 중 오류가 발생했습니다.');
     } finally {
-      console.log('finally 블록 실행');
       setLoading(false);
-      console.log('로딩 상태 false로 설정 완료');
     }
   };
 
@@ -130,66 +120,49 @@ export default function AdminTimeSlots() {
 
   const handleAddTimeSlot = async (e) => {
     e.preventDefault();
-    console.log('일정 추가 시작:', newTimeSlotData);
     
-    if (!newTimeSlotData.title || !newTimeSlotData.baseDate || !newTimeSlotData.endDate) {
-      toast.error('제목, 배정일, 종료일을 모두 입력해주세요.');
-      return;
-    }
-
-    if (new Date(newTimeSlotData.baseDate) >= new Date(newTimeSlotData.endDate)) {
-      toast.error('종료일은 배정일보다 이후여야 합니다.');
+    if (!newTimeSlotData.name || !newTimeSlotData.baseDate || !newTimeSlotData.endDate) {
+      toast.error('모든 필드를 입력해주세요.');
       return;
     }
     
     try {
       setIsSubmitting(true);
-      console.log('일정 추가 API 호출 전:', newTimeSlotData);
       
-      // 날짜 형식이 문제일 수 있으므로 ISO 문자열로 변환
-      const baseDate = new Date(newTimeSlotData.baseDate);
-      const endDate = new Date(newTimeSlotData.endDate);
+      // 날짜 변환
+      const baseDateLocal = new Date(newTimeSlotData.baseDate);
+      const endDateLocal = new Date(newTimeSlotData.endDate);
       
-      console.log('변환된 날짜:', {
-        baseDate,
-        endDate,
-        baseDateString: baseDate.toISOString(),
-        endDateString: endDate.toISOString(),
-      });
-      
-      // baseDate를 기준으로 유형별 시간 슬롯 계산하여 API 호출
       const timeSlotData = {
-        title: newTimeSlotData.title,
-        description: newTimeSlotData.description || '',
-        baseDate: baseDate.toISOString(),  // ISO 형식으로 변환
-        endDate: endDate.toISOString(),    // ISO 형식으로 변환
+        name: newTimeSlotData.name.trim(),
+        baseDate: baseDateLocal.toISOString(),
+        endDate: endDateLocal.toISOString(),
         active: newTimeSlotData.active
       };
-      
-      console.log('API 호출 데이터:', timeSlotData);
+
       const result = await createTimeSlot(timeSlotData);
-      console.log('일정 추가 결과:', result);
       
-      toast.success('일정이 추가되었습니다.');
-      setShowAddModal(false);
-      setNewTimeSlotData({
-        title: '',
-        description: '',
-        baseDate: '',
-        endDate: '',
-        active: true
-      });
-      
-      // 성공 후 일정 목록 다시 로드
-      console.log('일정 목록 다시 로드');
-      await loadTimeSlots();
+      if (result.success) {
+        toast.success('일정이 추가되었습니다.');
+        setShowAddModal(false);
+        setNewTimeSlotData({
+          name: '',
+          baseDate: '',
+          endDate: '',
+          active: true
+        });
+        await loadTimeSlots();
+      } else {
+        toast.error(result.message || '일정 추가 중 오류가 발생했습니다.');
+      }
     } catch (error) {
       console.error('일정 추가 오류 상세:', error);
       console.error('에러 응답:', error.response);
-      toast.error(error.response?.data?.message || '일정 추가 중 오류가 발생했습니다.');
+      
+      const errorMessage = error.response?.data?.message || error.message || '일정 추가 중 오류가 발생했습니다.';
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
-      console.log('일정 추가 처리 완료');
     }
   };
 

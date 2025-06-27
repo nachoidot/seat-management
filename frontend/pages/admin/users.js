@@ -45,7 +45,6 @@ export default function AdminUsers() {
     try {
       setLoading(true);
       const response = await getUsers();
-      console.log('API 응답:', response); // 디버깅용 로그
       setUsers(response.data || []); // 올바른 응답 구조로 수정
       setSelectedUsers([]); // 사용자 목록이 새로고침되면 선택 초기화
     } catch (error) {
@@ -78,10 +77,8 @@ export default function AdminUsers() {
   const handleBulkDelete = async (type, options = {}) => {
     try {
       setIsSubmitting(true);
-      console.log('일괄 삭제 시작:', { type, options });
       
       const response = await bulkDeleteUsers(options);
-      console.log('일괄 삭제 응답:', response);
       
       toast.success(response.message || '사용자가 삭제되었습니다.');
       setSelectedUsers([]);

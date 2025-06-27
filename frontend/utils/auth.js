@@ -37,7 +37,6 @@ export const logout = async (isAutoLogout = false) => {
   try {
     // 서버에서 쿠키 삭제
     await apiLogout();
-    console.log('Logout API called successfully');
   } catch (error) {
     // 서버 호출 실패해도 클라이언트에서 로그아웃 진행
     console.error('Logout API call failed:', error);
