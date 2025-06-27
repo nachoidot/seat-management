@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Layout from '../components/Layout';
 import { getSeats, getTimeSlots } from '../utils/api';
-import { useAuth, getCurrentUser } from '../utils/auth';
+import { useAuthStatus } from '../utils/auth';
 import { toast } from 'react-toastify';
 import timeUtils, { 
   calculateStartTimeByPriority, 
@@ -30,11 +30,15 @@ export default function Home() {
   const [userTimeSlot, setUserTimeSlot] = useState(null);
   const router = useRouter();
   
-  // Use auth hook to protect this page
-  const isAuthenticated = useAuth();
-  
-  // 현재 사용자 정보를 메모이제이션
-  const currentUser = useMemo(() => getCurrentUser(), [isAuthenticated]);
+  // Use auth hook to protect this page and get user data
+  const { user: currentUser, loading: authLoading, authenticated } = useAuthStatus();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !authenticated) {
+      router.push('/login');
+    }
+  }, [authLoading, authenticated, router]);
 
   // loadData 함수를 useCallback으로 메모이제이션
   const loadData = useCallback(async (user = currentUser) => {
@@ -77,10 +81,10 @@ export default function Home() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (isAuthenticated && currentUser) {
+    if (authenticated && currentUser) {
       loadData(currentUser);
     }
-  }, [isAuthenticated, currentUser, loadData]);
+  }, [authenticated, currentUser, loadData]);
 
   // 시간 포맷팅 함수를 메모이제이션
   const formatDateTime = useCallback((dateString) => {
@@ -190,8 +194,8 @@ export default function Home() {
     return { displaySlot, rows };
   }, [timeSlots, currentUser, formatDateTime]);
 
-  if (!isAuthenticated) {
-    return null; // The useAuth hook will redirect to login
+  if (!authenticated) {
+    return null; // The useAuthStatus hook will redirect to login
   }
 
   const isClient = typeof window !== 'undefined';

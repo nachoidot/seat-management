@@ -6,29 +6,20 @@ const User = require('../models/User');
 // @access  Public
 exports.login = async (req, res) => {
   try {
-    const { studentId, name, birthdate } = req.body;
-    console.log('Login attempt:', { studentId, name, birthdate });
-    console.log('요청 데이터 타입:', {
-      studentIdType: typeof studentId,
-      nameType: typeof name,
-      birthdateType: typeof birthdate
-    });
+    const { studentId, name, password, birthdate } = req.body;
     
-    // 검증 - 생년월일은 선택사항
-    if (!studentId || !name) {
-      console.log('Missing required fields');
+    // 검증 - password는 필수, 생년월일은 선택사항
+    if (!studentId || !name || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide student ID and name'
+        message: 'Please provide student ID, name and password'
       });
     }
 
-    // 사용자 찾기
-    const user = await User.findOne({ studentId });
-    console.log('User found:', user);
+    // 사용자 찾기 (비밀번호 포함)
+    const user = await User.findOne({ studentId }).select('+password');
 
     if (!user) {
-      console.log('User not found');
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -36,13 +27,16 @@ exports.login = async (req, res) => {
     }
 
     // 이름 확인
-    console.log('Comparing names:', { 
-      dbName: user.name, 
-      inputName: name
-    });
-    
     if (user.name !== name) {
-      console.log('Name mismatch');
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // 비밀번호 확인
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -51,13 +45,7 @@ exports.login = async (req, res) => {
 
     // 생년월일이 제공된 경우에만 확인 (기존 사용자 호환성)
     if (birthdate && user.birthdate && user.birthdate.trim() !== '') {
-      console.log('Checking birthdate:', { 
-        dbBirthdate: user.birthdate, 
-        inputBirthdate: birthdate 
-      });
-      
       if (user.birthdate !== birthdate) {
-        console.log('Birthdate mismatch');
         return res.status(401).json({
           success: false,
           message: 'Invalid credentials'
@@ -65,14 +53,15 @@ exports.login = async (req, res) => {
       }
     }
 
-    // 여기까지 왔다면 성공
-    console.log('Login successful');
+    // 로그인 성공
     sendTokenResponse(user, 200, res);
   } catch (err) {
-    console.error('Login error details:', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Login error:', err);
+    }
     res.status(500).json({
       success: false,
-      message: 'Server error: ' + err.message
+      message: 'Server error'
     });
   }
 };
@@ -89,11 +78,29 @@ exports.getMe = async (req, res) => {
       data: user
     });
   } catch (err) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('GetMe error:', err);
+    }
     res.status(500).json({
       success: false,
       message: 'Server error'
     });
   }
+};
+
+// @desc    Logout user / clear cookie
+// @route   GET /api/auth/logout
+// @access  Private
+exports.logout = async (req, res) => {
+  res.cookie('token', 'none', {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Logout successful'
+  });
 };
 
 // Helper function to get token from model, create cookie and send response
@@ -107,14 +114,25 @@ const sendTokenResponse = (user, statusCode, res) => {
     }
   );
 
-  res.status(statusCode).json({
-    success: true,
-    token,
-    user: {
-      studentId: user.studentId,
-      name: user.name,
-      priority: user.priority,
-      isAdmin: user.isAdmin
-    }
-  });
+  const options = {
+    expires: new Date(
+      Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000,
+    ),
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // HTTPS에서만 전송
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict' // Cross-origin 요청을 위해 production에서는 'none'
+  };
+
+  res
+    .status(statusCode)
+    .cookie('token', token, options)
+    .json({
+      success: true,
+      user: {
+        studentId: user.studentId,
+        name: user.name,
+        priority: user.priority,
+        isAdmin: user.isAdmin
+      }
+    });
 }; 

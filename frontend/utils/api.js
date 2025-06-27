@@ -17,15 +17,12 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // 쿠키 자동 전송 설정
 });
 
-// Request interceptor to add token to requests
+// Request interceptor - localStorage 제거, 쿠키는 자동으로 전송됨
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
     return config;
   },
   (error) => {
@@ -78,12 +75,18 @@ const makeRequestWithDeduplication = async (key, requestFn) => {
 };
 
 // Authentication API calls
-export const login = async (studentId, name, birthdate = '') => {
+export const login = async (studentId, name, password, birthdate = '') => {
   const response = await api.post('/auth/login', {
     studentId,
     name,
+    password,
     birthdate
   });
+  return response.data;
+};
+
+export const logout = async () => {
+  const response = await api.get('/auth/logout');
   return response.data;
 };
 

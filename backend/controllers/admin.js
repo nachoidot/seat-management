@@ -67,10 +67,11 @@ exports.createUser = async (req, res) => {
       });
     }
 
-    // 사용자 생성
+    // 사용자 생성 (초기 비밀번호: sg1234)
     const user = await User.create({
       studentId,
       name,
+      password: 'sg1234', // 초기 비밀번호 설정
       birthdate: birthdate || '', // 빈 문자열로 기본값 설정
       priority,
       isAdmin
@@ -404,6 +405,7 @@ exports.bulkCreateUsers = async (req, res) => {
       validUsers.push({
         studentId: user.studentId.toString().trim(),
         name: user.name.toString().trim(),
+        password: 'sg1234', // 초기 비밀번호 설정
         birthdate: user.birthdate ? user.birthdate.toString().trim() : '', // 빈 값 허용
         priority: priority,
         isAdmin: user.isAdmin === 'true' || user.isAdmin === true || false

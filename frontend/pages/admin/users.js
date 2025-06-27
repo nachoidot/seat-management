@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import AdminNav from '../../components/AdminNav';
 import { getUsers, createUser, deleteUser, updateUser, bulkCreateUsers, bulkDeleteUsers } from '../../utils/api';
-import { isAuthenticated, getCurrentUser } from '../../utils/auth';
+import { useAdmin } from '../../utils/auth';
 import { toast } from 'react-toastify';
 import { FaPlus, FaTrash, FaEdit, FaUserShield, FaUser, FaUpload, FaDownload, FaTrashAlt, FaCheckSquare, FaSquare } from 'react-icons/fa';
 import { ClientOnly } from '../../utils/client-only';
@@ -24,6 +24,7 @@ export default function AdminUsers() {
   const [newUserData, setNewUserData] = useState({
     studentId: '',
     name: '',
+    birthdate: '',
     priority: 3,
     isAdmin: false
   });
@@ -31,40 +32,20 @@ export default function AdminUsers() {
   
   const router = useRouter();
 
+  // Use admin hook to protect this page
+  const isAdmin = useAdmin();
+
   useEffect(() => {
-    const checkAuthAndLoadData = async () => {
-      try {
-        // 로그인 확인
-        const isAuth = isAuthenticated();
-        if (!isAuth) {
-          router.push('/login');
-          return;
-        }
-
-        // 사용자 정보 가져오기
-        const user = getCurrentUser();
-        
-        // 관리자 권한 확인
-        if (!user || !user.isAdmin) {
-          toast.error('관리자 권한이 필요합니다.');
-          router.push('/');
-          return;
-        }
-
-        await loadUsers();
-      } catch (error) {
-        console.error('인증 오류:', error);
-      }
-    };
-
-    checkAuthAndLoadData();
-  }, []);
+    if (isAdmin) {
+      loadUsers();
+    }
+  }, [isAdmin]);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
       const response = await getUsers();
-      setUsers(response.data || []);
+      setUsers(response.data.data || []); // API 응답 구조에 맞게 수정
       setSelectedUsers([]); // 사용자 목록이 새로고침되면 선택 초기화
     } catch (error) {
       console.error('사용자 로드 오류:', error);
@@ -141,6 +122,7 @@ export default function AdminUsers() {
       setNewUserData({
         studentId: '',
         name: '',
+        birthdate: '',
         priority: 3,
         isAdmin: false
       });
@@ -158,6 +140,7 @@ export default function AdminUsers() {
     setNewUserData({
       studentId: user.studentId,
       name: user.name,
+      birthdate: user.birthdate,
       priority: user.priority,
       isAdmin: user.isAdmin
     });
@@ -167,13 +150,13 @@ export default function AdminUsers() {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     
-    if (!newUserData.name || !newUserData.birthdate) {
-      toast.error('이름과 생년월일을 입력해주세요.');
+    if (!newUserData.name) {
+      toast.error('이름을 입력해주세요.');
       return;
     }
 
-    // 생년월일 형식 확인 (YYYYMMDD)
-    if (!/^\d{8}$/.test(newUserData.birthdate)) {
+    // 생년월일 형식 확인 (선택사항이지만 입력한 경우 형식 검증)
+    if (newUserData.birthdate && !/^\d{8}$/.test(newUserData.birthdate)) {
       toast.error('생년월일은 YYYYMMDD 형식의 8자리 숫자로 입력해주세요.');
       return;
     }
@@ -360,7 +343,7 @@ export default function AdminUsers() {
       
       <div className="min-h-screen bg-gray-100 md:ml-64">
         <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-between items-center mb-8">
+                      <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold text-primary">사용자 관리</h1>
             
             <div className="flex space-x-2">
@@ -386,6 +369,7 @@ export default function AdminUsers() {
                 setNewUserData({
                   studentId: '',
                   name: '',
+                  birthdate: '',
                   priority: 3,
                   isAdmin: false
                 });
@@ -396,6 +380,26 @@ export default function AdminUsers() {
               <FaPlus className="mr-2" /> 사용자 추가
             </button>
           </div>
+          </div>
+          
+          {/* 초기 비밀번호 안내 */}
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">초기 비밀번호 안내</h3>
+                <div className="mt-2 text-sm text-blue-700">
+                  <p>
+                    새로 생성되는 모든 사용자의 초기 비밀번호는 <strong className="bg-blue-200 px-1 rounded">sg1234</strong>로 설정됩니다. 
+                    사용자들에게 첫 로그인 후 비밀번호 변경을 안내하세요.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
           
           {loading ? (
@@ -847,6 +851,22 @@ export default function AdminUsers() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">CSV 일괄 업로드</h2>
+            
+            {/* 초기 비밀번호 안내 */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-800">
+                    모든 새 사용자의 초기 비밀번호는 <strong>sg1234</strong>로 자동 설정됩니다.
+                  </p>
+                </div>
+              </div>
+            </div>
             
             {csvErrors.length > 0 && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">

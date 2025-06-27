@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const UserSchema = new mongoose.Schema({
   studentId: {
@@ -11,6 +12,12 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a name'],
     trim: true
+  },
+  password: {
+    type: String,
+    required: [true, 'Please add a password'],
+    minlength: 6,
+    select: false // 기본적으로 비밀번호는 조회 시 제외
   },
   birthdate: {
     type: String,
@@ -34,6 +41,23 @@ const UserSchema = new mongoose.Schema({
   }
 });
 
+// 비밀번호 해시화 미들웨어
+UserSchema.pre('save', async function(next) {
+  // 비밀번호가 수정되지 않았으면 다음으로
+  if (!this.isModified('password')) {
+    next();
+  }
+
+  // 비밀번호 해시화
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
+
+// 비밀번호 검증 메서드
+UserSchema.methods.matchPassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
 // Create virtual property for full name
 UserSchema.virtual('fullName').get(function() {
   return `${this.name}`;
@@ -41,6 +65,5 @@ UserSchema.virtual('fullName').get(function() {
 
 // User 모델을 'users' 컬렉션에 명시적으로 연결
 const UserModel = mongoose.model('User', UserSchema, 'users');
-console.log('User 모델 컬렉션 이름:', UserModel.collection.name);
 
 module.exports = UserModel; 

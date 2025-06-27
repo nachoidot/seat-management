@@ -2,23 +2,32 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { login, getAdminInfo } from '../utils/api';
-import { setAuth, isAuthenticated } from '../utils/auth';
+import { isAuthenticated } from '../utils/auth';
 import { toast } from 'react-toastify';
 
 export default function Login() {
   const [formData, setFormData] = useState({
     studentId: '',
-    name: ''
+    name: '',
+    password: '',
+    birthdate: ''
   });
   const [loading, setLoading] = useState(false);
   const [adminInfo, setAdminInfo] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect if already logged in
-    if (isAuthenticated()) {
-      router.push('/');
-    }
+    // Check if already logged in
+    const checkAuth = async () => {
+      const authenticated = await isAuthenticated();
+      if (authenticated) {
+        router.push('/');
+      }
+      setAuthLoading(false);
+    };
+
+    checkAuth();
 
     // 관리자 정보 로드
     loadAdminInfo();
@@ -47,17 +56,21 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.studentId || !formData.name) {
-      toast.error('학번과 이름을 모두 입력해주세요.');
+    if (!formData.studentId || !formData.name || !formData.password) {
+      toast.error('학번, 이름, 비밀번호를 모두 입력해주세요.');
       return;
     }
     
     try {
       setLoading(true);
-      const response = await login(formData.studentId, formData.name);
+      const response = await login(
+        formData.studentId, 
+        formData.name, 
+        formData.password, 
+        formData.birthdate
+      );
       
       if (response.success) {
-        setAuth(response.token, response.user);
         toast.success('로그인 성공!');
         
         // 관리자인 경우 관리자 대시보드로 리디렉션, 일반 사용자는 메인 페이지로 리디렉션
@@ -75,6 +88,19 @@ export default function Login() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <Layout title="로그인 - 연구실 자리 배정 시스템">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-gray-600">로딩 중...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout title="로그인 - 연구실 자리 배정 시스템">
       <div className="flex items-center justify-center min-h-screen bg-secondary">
@@ -85,13 +111,13 @@ export default function Login() {
                 <img src="/images/logo.png" alt="서강대학교 로고" className="h-24 w-auto" />
               </div>
               <h1 className="text-3xl font-bold text-primary">연구실 자리 배정 시스템</h1>
-              <p className="text-gray-600 mt-2">학번/수험번호와 이름으로 로그인하세요</p>
+              <p className="text-gray-600 mt-2">학번, 이름, 비밀번호로 로그인하세요</p>
             </div>
             
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
                 <label htmlFor="studentId" className="block text-gray-700 text-sm font-bold mb-2">
-                  학번/수험번호
+                  학번/수험번호 *
                 </label>
                 <input
                   type="text"
@@ -105,9 +131,9 @@ export default function Login() {
                 />
               </div>
               
-              <div className="mb-6">
+              <div className="mb-4">
                 <label htmlFor="name" className="block text-gray-700 text-sm font-bold mb-2">
-                  이름
+                  이름 *
                 </label>
                 <input
                   type="text"
@@ -119,6 +145,40 @@ export default function Login() {
                   placeholder="이름을 입력하세요"
                   required
                 />
+              </div>
+
+              <div className="mb-4">
+                <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">
+                  비밀번호 *
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  placeholder="비밀번호를 입력하세요"
+                  required
+                />
+              </div>
+
+              <div className="mb-6">
+                <label htmlFor="birthdate" className="block text-gray-700 text-sm font-bold mb-2">
+                  생년월일 (선택사항)
+                </label>
+                <input
+                  type="text"
+                  id="birthdate"
+                  name="birthdate"
+                  value={formData.birthdate}
+                  onChange={handleChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  placeholder="YYYYMMDD 형식 (예: 19990101)"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  생년월일은 추가 보안을 위한 선택사항입니다.
+                </p>
               </div>
               
               <div className="flex items-center justify-between">
