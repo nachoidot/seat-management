@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const logger = require('../utils/logger');
 
 // Protect routes
 exports.protect = async (req, res, next) => {
@@ -28,10 +29,29 @@ exports.protect = async (req, res, next) => {
   try {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    req.user = await User.findOne({ studentId: decoded.id });
+    
+    // auth.js에서 studentId로 토큰을 생성했으므로 decoded.studentId 사용
+    const user = await User.findOne({ studentId: decoded.studentId });
+    
+    if (!user) {
+      logger.warn('User not found with decoded studentId', { 
+        studentId: decoded.studentId,
+        ip: req.ip 
+      });
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to access this resource'
+      });
+    }
+    
+    req.user = user;
     next();
   } catch (err) {
+    logger.warn('JWT verification failed', { 
+      error: err.message,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
     return res.status(401).json({
       success: false,
       message: 'Not authorized to access this resource'

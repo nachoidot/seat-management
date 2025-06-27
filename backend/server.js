@@ -159,6 +159,23 @@ if (process.env.NODE_ENV === 'development') {
       });
     }
   });
+
+  // JWT 시크릿 변경 시 강제 로그아웃 API (임시)
+  app.post('/api/debug/force-logout', (req, res) => {
+    logger.info('Force logout called - clearing all JWT cookies');
+    
+    res.cookie('token', 'none', {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+    
+    res.status(200).json({
+      success: true,
+      message: 'All users logged out successfully'
+    });
+  });
 }
 
 // Root route
