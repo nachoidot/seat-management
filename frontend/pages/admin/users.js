@@ -45,7 +45,8 @@ export default function AdminUsers() {
     try {
       setLoading(true);
       const response = await getUsers();
-      setUsers(response.data.data || []); // API 응답 구조에 맞게 수정
+      console.log('API 응답:', response); // 디버깅용 로그
+      setUsers(response.data || []); // 올바른 응답 구조로 수정
       setSelectedUsers([]); // 사용자 목록이 새로고침되면 선택 초기화
     } catch (error) {
       console.error('사용자 로드 오류:', error);
