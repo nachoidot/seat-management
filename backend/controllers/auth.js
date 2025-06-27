@@ -103,6 +103,67 @@ exports.logout = async (req, res) => {
   });
 };
 
+// @desc    Change user password
+// @route   PUT /api/auth/change-password
+// @access  Private
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    // 필수 필드 검증
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide current password and new password'
+      });
+    }
+
+    // 새 비밀번호 길이 검증
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters'
+      });
+    }
+
+    // 사용자 찾기 (비밀번호 포함)
+    const user = await User.findOne({ studentId: req.user.studentId }).select('+password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // 현재 비밀번호 확인
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // 새 비밀번호 설정
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (err) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Change password error:', err);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
 // Helper function to get token from model, create cookie and send response
 const sendTokenResponse = (user, statusCode, res) => {
   // Create token

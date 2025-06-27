@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Layout from '../components/Layout';
-import { getSeats, getTimeSlots } from '../utils/api';
+import { getSeats, getTimeSlots, changePassword } from '../utils/api';
 import { useAuthStatus } from '../utils/auth';
 import { toast } from 'react-toastify';
 import timeUtils, { 
@@ -28,6 +28,13 @@ export default function Home() {
   const [timeSlots, setTimeSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userTimeSlot, setUserTimeSlot] = useState(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const router = useRouter();
   
   // Use auth hook to protect this page and get user data
@@ -194,6 +201,47 @@ export default function Home() {
     return { displaySlot, rows };
   }, [timeSlots, currentUser, formatDateTime]);
 
+  // 비밀번호 변경 함수
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('새 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast.error('새 비밀번호는 최소 6자 이상이어야 합니다.');
+      return;
+    }
+
+    setPasswordLoading(true);
+    
+    try {
+      await changePassword(passwordData.currentPassword, passwordData.newPassword);
+      toast.success('비밀번호가 성공적으로 변경되었습니다.');
+      setShowPasswordModal(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.message || '비밀번호 변경에 실패했습니다.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const closePasswordModal = () => {
+    setShowPasswordModal(false);
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+  };
+
   if (!authenticated) {
     return null; // The useAuthStatus hook will redirect to login
   }
@@ -203,7 +251,24 @@ export default function Home() {
   return (
     <Layout title="연구실 자리 배정 시스템">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-primary mb-6">연구실 자리 배정</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-primary">연구실 자리 배정</h1>
+          <div className="flex items-center space-x-4">
+            {currentUser && (
+              <>
+                <span className="text-sm text-gray-600">
+                  환영합니다, {currentUser.name}님
+                </span>
+                <button
+                  onClick={() => setShowPasswordModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                >
+                  비밀번호 변경
+                </button>
+              </>
+            )}
+          </div>
+        </div>
         
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-bold text-primary mb-4">배정 일정</h2>
@@ -299,6 +364,89 @@ export default function Home() {
             <p className="text-gray-500">등록된 좌석이 없습니다.</p>
           )}
         </div>
+
+        {/* 비밀번호 변경 모달 */}
+        {showPasswordModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">비밀번호 변경</h3>
+              
+              <form onSubmit={handlePasswordChange}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      현재 비밀번호
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData({
+                        ...passwordData,
+                        currentPassword: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      새 비밀번호
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData({
+                        ...passwordData,
+                        newPassword: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                      minLength={6}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      최소 6자 이상 입력해주세요.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      새 비밀번호 확인
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData({
+                        ...passwordData,
+                        confirmPassword: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={closePasswordModal}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                    disabled={passwordLoading}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    disabled={passwordLoading}
+                  >
+                    {passwordLoading ? '변경 중...' : '변경하기'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
