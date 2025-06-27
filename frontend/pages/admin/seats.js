@@ -4,7 +4,7 @@ import Layout from '../../components/Layout';
 import AdminNav from '../../components/AdminNav';
 import SeatGrid from '../../components/SeatGrid';
 import { getSeats, createBatchSeats, resetSeats, bulkConfirmSeats, getSeatAssignmentStats, getUsers } from '../../utils/api';
-import { isAuthenticated, getCurrentUser } from '../../utils/auth';
+import { useAdmin } from '../../utils/auth';
 import { toast } from 'react-toastify';
 import { FaPlus, FaTrash, FaEdit, FaUndo, FaCheck, FaCheckCircle, FaClock, FaUsers } from 'react-icons/fa';
 import { ClientOnly } from '../../utils/client-only';
@@ -28,31 +28,32 @@ export default function AdminSeats() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const router = useRouter();
+  
+  // 관리자 권한 확인
+  const isAdmin = useAdmin();
 
   useEffect(() => {
-    const checkAuthAndLoadData = async () => {
-      try {
-        const isAuth = isAuthenticated();
-        if (!isAuth) {
-          router.push('/login');
-          return;
-        }
+    if (isAdmin) {
+      loadAllData();
+    }
+  }, [isAdmin]);
 
-        const user = getCurrentUser();
-        if (!user || !user.isAdmin) {
-          toast.error('관리자 권한이 필요합니다.');
-          router.push('/');
-          return;
-        }
+  // 권한이 없거나 로딩 중인 경우
+  if (isAdmin === null) {
+    return (
+      <Layout title="좌석 관리 - 연구실 자리 배정 시스템">
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600">인증 확인 중...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
-        await loadAllData();
-      } catch (error) {
-        console.error('인증 오류:', error);
-      }
-    };
-
-    checkAuthAndLoadData();
-  }, []);
+  if (isAdmin === false) {
+    return null; // useAdmin 훅이 자동으로 리다이렉트
+  }
 
   const loadAllData = async () => {
     try {

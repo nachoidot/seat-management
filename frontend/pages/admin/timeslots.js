@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import AdminNav from '../../components/AdminNav';
 import { getTimeSlots, createTimeSlot, updateTimeSlot, deleteTimeSlot } from '../../utils/api';
-import { isAuthenticated, getCurrentUser } from '../../utils/auth';
+import { useAdmin } from '../../utils/auth';
 import { toast } from 'react-toastify';
 import { FaPlus, FaTrash, FaEdit, FaCalendarAlt, FaInfoCircle } from 'react-icons/fa';
 import { ClientOnly } from '../../utils/client-only';
@@ -34,35 +34,32 @@ export default function AdminTimeSlots() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const router = useRouter();
+  
+  // 관리자 권한 확인
+  const isAdmin = useAdmin();
 
   useEffect(() => {
-    const checkAuthAndLoadData = async () => {
-      try {
-        // 로그인 확인
-        const isAuth = isAuthenticated();
-        if (!isAuth) {
-          router.push('/login');
-          return;
-        }
+    if (isAdmin) {
+      loadTimeSlots();
+    }
+  }, [isAdmin]);
 
-        // 사용자 정보 가져오기
-        const user = getCurrentUser();
-        
-        // 관리자 권한 확인
-        if (!user || !user.isAdmin) {
-          toast.error('관리자 권한이 필요합니다.');
-          router.push('/');
-          return;
-        }
+  // 권한이 없거나 로딩 중인 경우
+  if (isAdmin === null) {
+    return (
+      <Layout title="일정 관리 - 연구실 자리 배정 시스템">
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600">인증 확인 중...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
-        await loadTimeSlots();
-      } catch (error) {
-        console.error('인증 오류:', error);
-      }
-    };
-
-    checkAuthAndLoadData();
-  }, []);
+  if (isAdmin === false) {
+    return null; // useAdmin 훅이 자동으로 리다이렉트
+  }
 
   const loadTimeSlots = async () => {
     console.log('loadTimeSlots 시작');
