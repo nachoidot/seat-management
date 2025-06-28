@@ -87,7 +87,7 @@ exports.login = async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      sameSite: 'none',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30일
     });
 
@@ -154,7 +154,7 @@ exports.logout = async (req, res) => {
       expires: new Date(Date.now() + 10 * 1000), // 10초 후 만료
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'none',
     });
 
     logger.logAuth('logout', req.user?.studentId || 'unknown', true);
