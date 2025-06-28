@@ -17,12 +17,17 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // 쿠키 자동 전송 설정
 });
 
-// Request interceptor - localStorage 제거, 쿠키는 자동으로 전송됨
+// Request interceptor - Authorization 헤더에 토큰 추가
 api.interceptors.request.use(
   (config) => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
     return config;
   },
   (error) => {

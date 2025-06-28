@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const cookieParser = require('cookie-parser');
 const logger = require('./utils/logger');
 
 // Load environment variables
@@ -52,7 +51,6 @@ app.options(
 
 // 기본 미들웨어 - 이 부분이 로깅 미들웨어보다 먼저 와야 함
 app.use(express.json());
-app.use(cookieParser());
 
 // HTTP 요청 로깅 미들웨어 (winston)
 app.use(logger.logRequest);
@@ -202,14 +200,7 @@ if (process.env.NODE_ENV === 'development') {
 
   // JWT 시크릿 변경 시 강제 로그아웃 API (임시)
   app.post('/api/debug/force-logout', (req, res) => {
-    logger.info('Force logout called - clearing all JWT cookies');
-
-    res.cookie('token', 'none', {
-      expires: new Date(Date.now() + 10 * 1000),
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-    });
+    logger.info('Force logout called');
 
     res.status(200).json({
       success: true,
