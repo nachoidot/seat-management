@@ -10,16 +10,15 @@
 - **초기 비밀번호**: 모든 사용자에게 "sg1234" 자동 할당
 - **비밀번호 변경**: 메인 페이지에서 즉시 변경 가능
 
-### 2. HttpOnly Cookie 기반 토큰 저장
+### 2. Authorization 헤더 기반 토큰 저장
 - **기존**: localStorage에 JWT 토큰 저장 (XSS 공격 취약)
-- **개선**: HttpOnly, Secure, SameSite 쿠키로 토큰 저장
-- **XSS 방어**: JavaScript로 토큰 접근 완전 차단
-- **CSRF 방어**: SameSite 속성으로 추가 보안
+- **변경**: 클라이언트에서 토큰을 보관하고 모든 요청에 `Authorization` 헤더로 전달
+- **쿠키 의존성 제거**: Safari 등에서의 제약 해결
 
 ### 3. 서버 기반 인증 확인
 - **기존**: 클라이언트에서 localStorage 토큰 확인
 - **개선**: `/auth/me` API로 서버에서 인증 상태 확인
-- **토큰 무효화**: 로그아웃 시 서버에서 쿠키 완전 삭제
+- **토큰 무효화**: 로그아웃 시 클라이언트 토큰 제거
 - **세션 보안**: 서버 검증을 통한 안전한 세션 관리
 
 ### 4. 민감정보 로깅 제거
@@ -39,9 +38,8 @@
 ### 백엔드
 - **Node.js** + **Express.js**
 - **MongoDB** (MongoDB Atlas)
-- **JWT** 인증 + **HttpOnly Cookies**
+- **JWT** 인증 (Authorization 헤더 사용)
 - **bcryptjs** 비밀번호 해시화
-- **cookie-parser** 쿠키 파싱
 - **CORS** 보안 설정
 - **File Upload** (multer)
 
@@ -49,7 +47,7 @@
 - **Next.js**
 - **React**
 - **TailwindCSS**
-- **Axios** (withCredentials: true)
+- **Axios**
 - **React Icons**
 - **React Toastify**
 
@@ -70,7 +68,7 @@ seat-management/
 │   │   ├── seats.js        # 좌석 배정 로직
 │   │   └── timeslots.js    # 시간 슬롯 관리
 │   ├── middleware/         # 미들웨어 함수들
-│   │   └── auth.js         # JWT 인증 미들웨어 (쿠키 + 헤더)
+│   │   └── auth.js         # JWT 인증 미들웨어 (헤더)
 │   ├── models/             # MongoDB 모델들
 │   │   ├── AdminInfo.js    # 관리자 정보 모델
 │   │   ├── Seat.js         # 좌석 모델
@@ -102,7 +100,7 @@ seat-management/
     ├── public/             # 정적 파일들
     ├── styles/             # CSS 스타일
     ├── utils/              # 유틸리티 함수들
-    │   ├── api.js          # API 호출 함수들 (쿠키 인증)
+    │   ├── api.js          # API 호출 함수들 (헤더 인증)
     │   ├── auth.js         # 인증 관련 함수들 (서버 확인)
     │   ├── client-only.js  # 클라이언트 전용 컴포넌트
     │   └── timeUtils.js    # 시간 계산 유틸리티
@@ -174,7 +172,7 @@ npm run dev
   - 2~11순위: 개별 배정 시간 + 15:00 이후 추가 접근
 - **🗺️ 실시간 좌석 배치도**: 501~510호 연구실 좌석 현황 확인
 - **🪑 좌석 신청/취소**: 클릭 한 번으로 간편한 좌석 관리
-- **🔒 안전한 세션**: HttpOnly 쿠키 기반 보안 세션
+- **🔒 안전한 세션**: Authorization 헤더 기반 토큰 검증
 
 ### 관리자
 #### 📊 대시보드
@@ -206,8 +204,7 @@ npm run dev
 
 ### 🔐 보안 기능 (강화)
 - **🛡️ bcrypt 비밀번호 해싱**: 안전한 비밀번호 저장
-- **🍪 HttpOnly 쿠키**: XSS 공격으로부터 토큰 보호
-- **🔒 CSRF 방어**: SameSite 쿠키 속성으로 보안 강화
+- **🍪 토큰 헤더 전송**: XSS/CSRF 취약점 최소화
 - **🚫 민감정보 로깅 차단**: 프로덕션에서 개인정보 보호
 - **🔑 서버 인증 확인**: 클라이언트 조작 불가능한 서버 검증
 - **⚡ 즉시 로그아웃**: 안전한 세션 종료
@@ -288,7 +285,7 @@ CloudType 무료 티어의 자동 슬립 문제를 해결하기 위한 **다중 
 - **초기값**: "sg1234" (모든 사용자 공통)
 
 ### 보안 고려사항
-- **쿠키 설정**: HttpOnly, Secure, SameSite 필수
+- **토큰 관리**: Authorization 헤더 사용
 - **환경변수**: JWT_SECRET은 최소 32자리 이상
 - **로깅**: 프로덕션에서 민감정보 출력 금지
 - **CORS**: 허용된 도메인만 접근 가능
@@ -298,12 +295,12 @@ CloudType 무료 티어의 자동 슬립 문제를 해결하기 위한 **다중 
 | 항목 | 기존 시스템 | 보안 강화 시스템 |
 |------|-------------|------------------|
 | 인증 방식 | 학번 + 이름 | 학번 + bcrypt 비밀번호 |
-| 토큰 저장 | localStorage | HttpOnly Cookie |
+| 토큰 저장 | localStorage | Authorization 헤더 |
 | 인증 확인 | 클라이언트 | 서버 API (/auth/me) |
-| XSS 방어 | ❌ | ✅ (HttpOnly) |
-| CSRF 방어 | ❌ | ✅ (SameSite) |
+| XSS 방어 | ❌ | ✅ (헤더 전송) |
+| CSRF 방어 | ❌ | ✅ (헤더 전송) |
 | 민감정보 로깅 | 모든 환경 | 개발환경만 |
-| 로그아웃 | 토큰 삭제 | 서버 쿠키 무효화 |
+| 로그아웃 | 토큰 삭제 | 클라이언트 토큰 제거 |
 | 비밀번호 변경 | ❌ | ✅ (즉시 변경) |
 
 ## 👨‍💻 개발자

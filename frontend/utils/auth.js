@@ -2,11 +2,32 @@ import { useRouter } from 'next/router';
 import { useEffect, useCallback, useState } from 'react';
 import { getMe, logout as apiLogout } from './api';
 
+// Token helpers
+export const setToken = (token) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('token', token);
+  }
+};
+
+export const getToken = () => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('token');
+};
+
+export const removeToken = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('token');
+  }
+};
+
 // Check if user is authenticated by calling server
 export const isAuthenticated = async () => {
   if (typeof window === 'undefined') {
     return false;
   }
+
+  const token = getToken();
+  if (!token) return false;
 
   try {
     const response = await getMe();
@@ -23,6 +44,9 @@ export const getCurrentUser = async () => {
     return null;
   }
 
+  const token = getToken();
+  if (!token) return null;
+
   try {
     const response = await getMe();
     console.log(`Second block res: ${response}`);
@@ -37,12 +61,14 @@ export const logout = async (isAutoLogout = false) => {
   if (typeof window === 'undefined') return;
 
   try {
-    // 서버에서 쿠키 삭제
+    // 서버에 로그아웃 알림 (옵션)
     await apiLogout();
   } catch (error) {
     // 서버 호출 실패해도 클라이언트에서 로그아웃 진행
     console.error('Logout API call failed:', error);
   }
+
+  removeToken();
 
   // 자동 로그아웃 시 알림
   if (isAutoLogout) {

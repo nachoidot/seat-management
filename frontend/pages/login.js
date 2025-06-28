@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { login, getAdminInfo } from '../utils/api';
-import { isAuthenticated } from '../utils/auth';
+import { isAuthenticated, setToken } from '../utils/auth';
 import { toast } from 'react-toastify';
 
 export default function Login() {
@@ -69,6 +69,9 @@ export default function Login() {
       );
       
       if (response.success) {
+        if (response.token) {
+          setToken(response.token);
+        }
         toast.success('로그인 성공!');
         
         // 관리자인 경우 관리자 대시보드로 리디렉션, 일반 사용자는 메인 페이지로 리디렉션

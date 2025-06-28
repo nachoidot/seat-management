@@ -83,18 +83,12 @@ exports.login = async (req, res) => {
       { expiresIn: '30d' }
     );
 
-    // HttpOnly 쿠키로 JWT 설정 (보안 강화)
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30일
-    });
-
     logger.logAuth('login', studentId, true, { name, isAdmin: user.isAdmin });
 
+    // 토큰을 응답 본문으로 전달
     res.status(200).json({
       success: true,
+      token,
       user: {
         studentId: user.studentId,
         name: user.name,
@@ -149,16 +143,9 @@ exports.getMe = async (req, res) => {
 // @access  Private
 exports.logout = async (req, res) => {
   try {
-    // 쿠키 완전 삭제
-    res.cookie('token', 'none', {
-      expires: new Date(Date.now() + 10 * 1000), // 10초 후 만료
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-    });
-
     logger.logAuth('logout', req.user?.studentId || 'unknown', true);
 
+    // 쿠키 대신 클라이언트 저장소에서 토큰을 삭제하도록 안내
     res.status(200).json({
       success: true,
       message: 'User logged out successfully',
