@@ -10,7 +10,8 @@ export const isAuthenticated = async () => {
 
   try {
     const response = await getMe();
-    return response.success && response.data;
+    console.log(`Frist block res: ${response}`);
+    return response.success && response.user;
   } catch (error) {
     return false;
   }
@@ -24,7 +25,8 @@ export const getCurrentUser = async () => {
 
   try {
     const response = await getMe();
-    return response.success ? response.data : null;
+    console.log(`Second block res: ${response}`);
+    return response.success ? response.user : null;
   } catch (error) {
     return null;
   }
@@ -33,7 +35,7 @@ export const getCurrentUser = async () => {
 // Logout function
 export const logout = async (isAutoLogout = false) => {
   if (typeof window === 'undefined') return;
-  
+
   try {
     // 서버에서 쿠키 삭제
     await apiLogout();
@@ -41,21 +43,21 @@ export const logout = async (isAutoLogout = false) => {
     // 서버 호출 실패해도 클라이언트에서 로그아웃 진행
     console.error('Logout API call failed:', error);
   }
-  
+
   // 자동 로그아웃 시 알림
   if (isAutoLogout) {
     alert('보안을 위해 세션이 만료되어 자동 로그아웃됩니다.');
   }
-  
+
   // 캐시 클리어 (선택사항)
   if ('caches' in window) {
-    caches.keys().then(names => {
-      names.forEach(name => {
+    caches.keys().then((names) => {
+      names.forEach((name) => {
         caches.delete(name);
       });
     });
   }
-  
+
   // Redirect to login page
   window.location.href = '/login';
 };
@@ -75,7 +77,7 @@ export const useAuth = (redirectUrl = '/login') => {
     const checkAuth = async () => {
       const isAuth = await isAuthenticated();
       setAuthenticated(isAuth);
-      
+
       if (!isAuth && router.pathname !== '/login') {
         router.push(redirectUrl);
       }
@@ -98,7 +100,7 @@ export const useAdmin = (redirectUrl = '/') => {
       if (authenticated) {
         const adminStatus = await isAdmin();
         setIsAdminUser(adminStatus);
-        
+
         if (!adminStatus) {
           router.push(redirectUrl);
         }
@@ -134,4 +136,4 @@ export const useAuthStatus = () => {
   }, []);
 
   return { user, loading, authenticated: !!user };
-}; 
+};
