@@ -227,42 +227,45 @@ exports.assignSeat = async (req, res) => {
         { new: true, runValidators: true }
       );
     } else {
-      // 일반 사용자의 경우 완전한 원자적 연산으로 race condition 방지
-      // MongoDB의 sparse unique 인덱스와 함께 작동하여 이중 보호 제공
+      // 일반 사용자의 경우: 먼저 사용자가 이미 좌석을 가지고 있는지 확인
+      const existingUserSeat = await Seat.findOne({ assignedTo: req.user.studentId });
       
-      try {
-        // 원자적 좌석 배정: 좌석이 비어있을 때만 배정
-        // assignedTo의 sparse unique 인덱스가 중복 배정을 DB 레벨에서 방지
-        seat = await Seat.findOneAndUpdate(
-          { 
-            number, 
-            section,
-            assignedTo: null  // 중요: 좌석이 비어있을 때만 배정
-          },
-          { 
-            assignedTo: req.user.studentId,
-            confirmed: false,
-            updatedAt: Date.now()
-          },
-          { new: true, runValidators: true }
-        );
+      if (existingUserSeat) {
+        return res.status(400).json({
+          success: false,
+          message: 'You already have a seat assigned',
+          data: {
+            currentSeat: {
+              roomNumber: existingUserSeat.roomNumber,
+              number: existingUserSeat.number,
+              section: existingUserSeat.section,
+              confirmed: existingUserSeat.confirmed
+            }
+          }
+        });
+      }
+      
+      // 원자적 좌석 배정: 좌석이 비어있을 때만 배정
+      seat = await Seat.findOneAndUpdate(
+        { 
+          number, 
+          section,
+          assignedTo: null  // 중요: 좌석이 비어있을 때만 배정
+        },
+        { 
+          assignedTo: req.user.studentId,
+          confirmed: false,
+          updatedAt: Date.now()
+        },
+        { new: true, runValidators: true }
+      );
 
-        // 좌석이 이미 배정되어 있어서 업데이트가 실패한 경우
-        if (!seat) {
-          return res.status(400).json({
-            success: false,
-            message: 'This seat is already assigned'
-          });
-        }
-      } catch (duplicateError) {
-        // MongoDB duplicate key error로 인한 실패 (사용자가 이미 다른 좌석 보유)
-        if (duplicateError.code === 11000 && duplicateError.keyPattern?.assignedTo) {
-          return res.status(400).json({
-            success: false,
-            message: 'You already have a seat assigned'
-          });
-        }
-        throw duplicateError; // 다른 에러는 상위 catch로 전달
+      // 좌석이 이미 배정되어 있어서 업데이트가 실패한 경우
+      if (!seat) {
+        return res.status(400).json({
+          success: false,
+          message: 'This seat is already assigned to someone else'
+        });
       }
     }
 
@@ -274,6 +277,7 @@ exports.assignSeat = async (req, res) => {
     logger.logError(err, req);
     
     // MongoDB duplicate key error (사용자가 이미 다른 좌석을 보유한 경우)
+    // 이중 보호: 위의 명시적 확인을 우회하는 race condition이 있을 경우
     if (err.code === 11000 && err.keyPattern?.assignedTo) {
       return res.status(400).json({
         success: false,

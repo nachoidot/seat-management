@@ -239,7 +239,40 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
       }
     } catch (error) {
       console.error('Error assigning seat:', error);
-      toast.error(error.response?.data?.message || '좌석 배정 중 오류가 발생했습니다.');
+      
+      // 이미 좌석을 가지고 있는 경우 특별 처리
+      if (error.response?.status === 400 && error.response?.data?.message?.includes('already have a seat')) {
+        const currentSeat = error.response?.data?.data?.currentSeat;
+        if (currentSeat) {
+          const confirmChange = window.confirm(
+            `이미 ${currentSeat.roomNumber}호 ${currentSeat.number}번 좌석을 배정받으셨습니다.\n` +
+            `기존 좌석을 취소하고 ${seat.roomNumber}호 ${seat.number}번 좌석으로 변경하시겠습니까?`
+          );
+          
+          if (confirmChange) {
+            try {
+              // 기존 좌석 해제
+              await unassignSeat(currentSeat.number, currentSeat.section);
+              // 새 좌석 배정
+              const newResult = await assignSeat(seat.number, seat.section);
+              toast.success(`좌석이 ${seat.roomNumber}호 ${seat.number}번으로 변경되었습니다.`);
+              setUserAssignedSeat(newResult.data);
+              
+              if (onSeatUpdate) {
+                onSeatUpdate();
+              }
+            } catch (changeError) {
+              console.error('Error changing seat:', changeError);
+              toast.error('좌석 변경 중 오류가 발생했습니다.');
+            }
+          }
+        } else {
+          toast.error('이미 다른 좌석을 배정받으셨습니다. 페이지를 새로고침 해주세요.');
+        }
+      } else {
+        // 기타 에러
+        toast.error(error.response?.data?.message || '좌석 배정 중 오류가 발생했습니다.');
+      }
     } finally {
       setLoading(false);
     }
