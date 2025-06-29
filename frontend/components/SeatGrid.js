@@ -6,7 +6,6 @@ import { FaColumns, FaFan, FaWindowMaximize, FaDoorOpen, FaMapMarkerAlt } from '
 
 const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null }) => {
   const [roomGroupedSeats, setRoomGroupedSeats] = useState({});
-  const [currentUser, setCurrentUser] = useState(null);
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activeRoom, setActiveRoom] = useState(null);
@@ -19,10 +18,23 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
   const [selectedSeatForAssign, setSelectedSeatForAssign] = useState(null);
   const [userSearchTerm, setUserSearchTerm] = useState('');
 
-  // 현재 사용자 정보를 메모이제이션
-  const user = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    return getCurrentUser();
+  // 현재 사용자 정보를 비동기적으로 가져오기
+  const [user, setUser] = useState(null);
+  
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (typeof window === 'undefined') return;
+      try {
+        const userData = await getCurrentUser();
+        console.log('SeatGrid: User data loaded:', userData);
+        setUser(userData);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setUser(null);
+      }
+    };
+    
+    fetchUser();
   }, []);
 
   // 룸별 좌석 그룹화를 메모이제이션
@@ -42,8 +54,9 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
         grouped[seat.roomNumber].push(seat);
         
         // 현재 사용자에게 배정된 좌석 확인
-        if (user && seat.assignedTo === user.studentId) {
+        if (user && user.studentId && seat.assignedTo === user.studentId) {
           foundUserSeat = seat;
+          console.log('SeatGrid: Found user seat:', seat);
           
           // 사용자의 좌석이 있는 방을 기본으로 활성화
           if (filterRoom === null) {
@@ -83,18 +96,25 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
     }
   }, [seats, user, filterRoom]);
 
+
+
   useEffect(() => {
-    setCurrentUser(user);
-    
     if (processedSeats.grouped) {
       setRoomGroupedSeats(processedSeats.grouped);
       setUserAssignedSeat(processedSeats.userSeat);
+      console.log('SeatGrid: Updated userAssignedSeat:', processedSeats.userSeat);
       
       if (processedSeats.defaultRoom && !activeRoom) {
         setActiveRoom(processedSeats.defaultRoom);
       }
     }
-  }, [processedSeats, user, activeRoom]);
+  }, [processedSeats]);
+  
+  useEffect(() => {
+    if (processedSeats.defaultRoom && !activeRoom) {
+      setActiveRoom(processedSeats.defaultRoom);
+    }
+  }, [processedSeats.defaultRoom, activeRoom]);
 
   // 사용자 목록 로드를 useCallback으로 메모이제이션
   const loadUsers = useCallback(async () => {
@@ -161,36 +181,53 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
       return;
     }
     
-    // 일반 사용자 모드 (기존 로직)
-    if (!isAdmin && userAssignedSeat && userAssignedSeat._id !== seat._id && !seat.assignedTo) {
-      const confirm = window.confirm(`이미 ${userAssignedSeat.roomNumber}호 ${userAssignedSeat.number}번 좌석을 배정받으셨습니다. 기존 좌석을 취소하고 이 좌석으로 변경하시겠습니까?`);
+    // 일반 사용자 모드
+    
+    // 1. 자신의 좌석을 클릭한 경우 - 취소 옵션
+    if (seat.assignedTo && user && user.studentId && seat.assignedTo === user.studentId) {
+      const seatStatus = seat.confirmed ? '확정된' : '신청 대기 중인';
+      const confirmMessage = seat.confirmed 
+        ? `확정된 좌석(${seat.roomNumber}호 ${seat.number}번)을 정말 취소하시겠습니까?\n\n⚠️ 확정된 좌석을 취소하면 다시 배정받기 어려울 수 있습니다.`
+        : `신청 중인 좌석(${seat.roomNumber}호 ${seat.number}번)을 취소하시겠습니까?`;
+      
+      const confirm = window.confirm(confirmMessage);
       if (confirm) {
-        await handleUnassignSeat(userAssignedSeat);
+        console.log('Canceling user seat:', seat);
+        await handleUnassignSeat(seat, true); // customMessage = true로 중복 토스트 방지
+        toast.success(`${seatStatus} 좌석이 취소되었습니다.`);
+      }
+      return;
+    }
+    
+    // 2. 다른 좌석을 클릭했는데 이미 좌석이 있는 경우 - 변경 옵션
+    if (!isAdmin && userAssignedSeat && userAssignedSeat._id !== seat._id && !seat.assignedTo) {
+      const currentSeatStatus = userAssignedSeat.confirmed ? '확정된' : '신청 대기 중인';
+      const confirmMessage = `이미 ${currentSeatStatus} 좌석(${userAssignedSeat.roomNumber}호 ${userAssignedSeat.number}번)이 있습니다.\n` +
+                           `기존 좌석을 취소하고 ${seat.roomNumber}호 ${seat.number}번 좌석으로 변경하시겠습니까?`;
+      
+      const confirm = window.confirm(confirmMessage);
+      if (confirm) {
+        console.log('Changing seat from', userAssignedSeat, 'to', seat);
+        await handleUnassignSeat(userAssignedSeat, true); // 중복 토스트 방지
         await handleAssignSeat(seat);
+        // handleAssignSeat에서 성공 메시지를 표시하므로 여기서는 별도 메시지 불필요
       }
       return;
     }
     
-    if (seat.assignedTo === currentUser?.studentId) {
-      if (window.confirm) {
-        const confirm = window.confirm('현재 배정된 좌석을 취소하시겠습니까?');
-        if (confirm) {
-          await handleUnassignSeat(seat);
-        }
-      }
-      return;
-    }
-    
+    // 3. 다른 사람의 좌석을 클릭한 경우
     if (seat.assignedTo && !isAdmin) {
-      toast.error('이미 배정된 좌석입니다.');
+      const seatStatus = seat.confirmed ? '확정됨' : '신청 대기 중';
+      toast.error(`이미 배정된 좌석입니다. (${seatStatus})`);
       return;
     }
     
-    const confirm = window.confirm('이 좌석을 신청하시겠습니까?');
+    // 4. 빈 좌석을 클릭한 경우 - 신청
+    const confirm = window.confirm(`${seat.roomNumber}호 ${seat.number}번 좌석을 신청하시겠습니까?`);
     if (confirm) {
       await handleAssignSeat(seat);
     }
-  }, [loading, isAdmin, availableUsers, userAssignedSeat, currentUser, loadUsers]);
+  }, [loading, isAdmin, availableUsers, userAssignedSeat, user, loadUsers]);
 
   // 관리자용 좌석 배정을 useCallback으로 메모이제이션
   const handleAdminAssignSeat = useCallback(async (studentId) => {
@@ -232,7 +269,13 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
       const result = await assignSeat(seat.number, seat.section);
       toast.success('좌석이 성공적으로 배정되었습니다.');
       
+      // 내 좌석 정보 업데이트
       setUserAssignedSeat(result.data);
+      
+      // 활성 룸을 배정된 좌석의 룸으로 변경
+      if (result.data && result.data.roomNumber) {
+        setActiveRoom(result.data.roomNumber);
+      }
       
       if (onSeatUpdate) {
         onSeatUpdate();
@@ -251,12 +294,19 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
           
           if (confirmChange) {
             try {
-              // 기존 좌석 해제
+              // 기존 좌석 해제 (무음 처리)
               await unassignSeat(currentSeat.number, currentSeat.section);
               // 새 좌석 배정
               const newResult = await assignSeat(seat.number, seat.section);
-              toast.success(`좌석이 ${seat.roomNumber}호 ${seat.number}번으로 변경되었습니다.`);
+              toast.success(`좌석이 ${currentSeat.roomNumber}호 ${currentSeat.number}번에서 ${seat.roomNumber}호 ${seat.number}번으로 변경되었습니다.`);
+              
+              // 내 좌석 정보 업데이트
               setUserAssignedSeat(newResult.data);
+              
+              // 활성 룸을 새 좌석의 룸으로 변경
+              if (newResult.data && newResult.data.roomNumber) {
+                setActiveRoom(newResult.data.roomNumber);
+              }
               
               if (onSeatUpdate) {
                 onSeatUpdate();
@@ -278,13 +328,22 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
     }
   };
 
-  const handleUnassignSeat = async (seat) => {
+  const handleUnassignSeat = async (seat, customMessage = null) => {
     try {
       setLoading(true);
       const result = await unassignSeat(seat.number, seat.section);
-      toast.success('좌석 배정이 취소되었습니다.');
       
-      setUserAssignedSeat(null);
+      // 커스텀 메시지가 없을 때만 기본 토스트 표시
+      if (!customMessage) {
+        const seatStatus = seat.confirmed ? '확정된' : '신청 대기 중인';
+        toast.success(`${seatStatus} 좌석(${seat.roomNumber}호 ${seat.number}번)이 취소되었습니다.`);
+      }
+      
+      // 내 좌석인지 확인 후 상태 업데이트
+      if (user && seat.assignedTo === user.studentId) {
+        setUserAssignedSeat(null);
+        console.log('User assigned seat cleared');
+      }
       
       if (onSeatUpdate) {
         onSeatUpdate();
@@ -336,7 +395,7 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
     }
     
     // 현재 사용자에게 배정된 좌석은 특별 표시
-    if (seat.assignedTo === currentUser?.studentId) {
+    if (seat.assignedTo && user && user.studentId && seat.assignedTo === user.studentId) {
       className += 'seat-mine ';
     }
     
@@ -480,9 +539,13 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
                         onClick={() => handleSeatClick(seat)}
                         onMouseEnter={() => handleMouseEnter(seat)}
                         onMouseLeave={handleMouseLeave}
-                        title={seat.assignedTo 
-                          ? `배정됨: ${seat.assignedTo}${seat.confirmed ? ' (확정)' : ''}` 
-                          : '배정 가능'}
+                        title={
+                          seat.assignedTo && user && user.studentId && seat.assignedTo === user.studentId
+                            ? `내 좌석 - 클릭하여 취소${seat.confirmed ? ' (확정됨)' : ' (신청 대기 중)'}`
+                            : seat.assignedTo 
+                              ? `배정됨: ${seat.assignedTo}${seat.confirmed ? ' (확정)' : ' (신청 대기 중)'}` 
+                              : '클릭하여 신청'
+                        }
                       >
                         {seat.number}
                       </div>
