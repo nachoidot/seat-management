@@ -194,6 +194,11 @@ export const deleteUser = async (id) => {
   return response.data;
 };
 
+export const resetUserPassword = async (id) => {
+  const response = await api.post(`/admin/users/${id}/reset-password`);
+  return response.data;
+};
+
 export const bulkCreateUsers = async (users) => {
   const response = await api.post('/admin/users/bulk', { users });
   return response.data;

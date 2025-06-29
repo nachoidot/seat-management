@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import AdminNav from '../../components/AdminNav';
-import { getUsers, createUser, deleteUser, updateUser, bulkCreateUsers, bulkDeleteUsers } from '../../utils/api';
+import { getUsers, createUser, deleteUser, updateUser, bulkCreateUsers, bulkDeleteUsers, resetUserPassword } from '../../utils/api';
 import { useAdmin } from '../../utils/auth';
 import { toast } from 'react-toastify';
-import { FaPlus, FaTrash, FaEdit, FaUserShield, FaUser, FaUpload, FaDownload, FaTrashAlt, FaCheckSquare, FaSquare } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaEdit, FaUserShield, FaUser, FaUpload, FaDownload, FaTrashAlt, FaCheckSquare, FaSquare, FaKey } from 'react-icons/fa';
 import { ClientOnly } from '../../utils/client-only';
 
 export default function AdminUsers() {
@@ -17,6 +17,7 @@ export default function AdminUsers() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [csvData, setCsvData] = useState([]);
@@ -190,6 +191,26 @@ export default function AdminUsers() {
     } catch (error) {
       console.error('사용자 삭제 오류:', error);
       toast.error(error.response?.data?.message || '사용자 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResetPasswordClick = (user) => {
+    setSelectedUser(user);
+    setShowResetPasswordModal(true);
+  };
+
+  const handleResetPassword = async () => {
+    try {
+      setIsSubmitting(true);
+      await resetUserPassword(selectedUser.studentId);
+      
+      toast.success(`${selectedUser.name} 사용자의 비밀번호가 초기값(sg1234)으로 재설정되었습니다.`);
+      setShowResetPasswordModal(false);
+    } catch (error) {
+      console.error('비밀번호 초기화 오류:', error);
+      toast.error(error.response?.data?.message || '비밀번호 초기화 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);
     }
@@ -562,13 +583,22 @@ export default function AdminUsers() {
                               <FaEdit />
                             </button>
                               {!user.isAdmin && (
-                            <button 
-                              onClick={() => handleDeleteClick(user)}
-                              className="text-red-600 hover:text-red-900" 
-                              title="삭제"
-                            >
-                              <FaTrash />
-                            </button>
+                                <>
+                                  <button 
+                                    onClick={() => handleResetPasswordClick(user)}
+                                    className="text-orange-600 hover:text-orange-900" 
+                                    title="비밀번호 초기화"
+                                  >
+                                    <FaKey />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteClick(user)}
+                                    className="text-red-600 hover:text-red-900" 
+                                    title="삭제"
+                                  >
+                                    <FaTrash />
+                                  </button>
+                                </>
                               )}
                           </div>
                         </td>
@@ -806,6 +836,41 @@ export default function AdminUsers() {
                 disabled={isSubmitting}
               >
                 {isSubmitting ? '처리중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 비밀번호 초기화 확인 모달 */}
+      {showResetPasswordModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-4 text-orange-600">비밀번호 초기화</h2>
+            <p className="mb-6 text-gray-700">
+              <strong>{selectedUser.name}</strong> ({selectedUser.studentId}) 사용자의 비밀번호를 초기값으로 재설정하시겠습니까?
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-yellow-800">
+                비밀번호가 <strong>sg1234</strong>로 재설정됩니다.
+              </p>
+            </div>
+            
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowResetPasswordModal(false)}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded mr-2"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? '처리중...' : '초기화'}
               </button>
             </div>
           </div>

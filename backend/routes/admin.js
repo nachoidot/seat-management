@@ -9,7 +9,8 @@ const {
   bulkConfirmSeats,
   getSeatAssignmentStats,
   getAdminInfo,
-  updateAdminInfo
+  updateAdminInfo,
+  resetUserPassword
 } = require('../controllers/admin');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -26,6 +27,7 @@ router.use(authorize(true));
 router.get('/users', getUsers);
 router.post('/users/bulk', bulkCreateUsers);
 router.post('/users/bulk-delete', bulkDeleteUsers);
+router.post('/users/:id/reset-password', resetUserPassword);
 
 // 좌석 관련 라우트  
 router.get('/seats', getSeats);

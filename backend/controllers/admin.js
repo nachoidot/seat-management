@@ -301,6 +301,59 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
+// @desc    Reset user password to default
+// @route   POST /api/admin/users/:id/reset-password
+// @access  Private (Admin only)
+exports.resetUserPassword = async (req, res) => {
+  try {
+    // admin 계정 비밀번호 초기화 방지
+    if (req.params.id === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account password cannot be reset'
+      });
+    }
+
+    const user = await User.findOne({ studentId: req.params.id });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `User not found with student ID of ${req.params.id}`
+      });
+    }
+
+    // 관리자 계정 비밀번호 초기화 방지 (추가 보안)
+    if (user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot reset admin user password'
+      });
+    }
+
+    // 비밀번호를 초기값으로 리셋
+    user.password = 'sg1234';
+    await user.save();
+
+    logger.logInfo(`Password reset for user: ${user.studentId} by admin`);
+
+    res.status(200).json({
+      success: true,
+      message: '사용자 비밀번호가 초기값으로 재설정되었습니다.',
+      data: {
+        studentId: user.studentId,
+        name: user.name
+      }
+    });
+  } catch (err) {
+    logger.logError('Error resetting user password:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
 // @desc    Get all seats
 // @route   GET /api/admin/seats
 // @access  Private (Admin only)
