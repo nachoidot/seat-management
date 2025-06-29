@@ -310,18 +310,18 @@ exports.resetUserPassword = async (req, res) => {
 
     // 입력값 검증
     if (!studentId) {
-      logger.logError('Reset password: Missing student ID');
+      logger.error('Reset password: Missing student ID');
       return res.status(400).json({
         success: false,
         message: 'Student ID is required'
       });
     }
 
-    logger.logInfo(`Password reset attempt for user: ${studentId}`);
+    logger.info(`Password reset attempt for user: ${studentId}`);
 
     // admin 계정 비밀번호 초기화 방지
     if (studentId === 'admin') {
-      logger.logWarn(`Blocked attempt to reset admin password`);
+      logger.warn(`Blocked attempt to reset admin password`);
       return res.status(403).json({
         success: false,
         message: 'Admin account password cannot be reset'
@@ -332,18 +332,18 @@ exports.resetUserPassword = async (req, res) => {
     const user = await User.findOne({ studentId: studentId }).select('+password');
 
     if (!user) {
-      logger.logWarn(`User not found for password reset: ${studentId}`);
+      logger.warn(`User not found for password reset: ${studentId}`);
       return res.status(404).json({
         success: false,
         message: `User not found with student ID of ${studentId}`
       });
     }
 
-    logger.logInfo(`Found user for password reset: ${user.studentId} (${user.name})`);
+    logger.info(`Found user for password reset: ${user.studentId} (${user.name})`);
 
     // 관리자 계정 비밀번호 초기화 방지 (추가 보안)
     if (user.isAdmin) {
-      logger.logWarn(`Blocked attempt to reset admin user password: ${user.studentId}`);
+      logger.warn(`Blocked attempt to reset admin user password: ${user.studentId}`);
       return res.status(403).json({
         success: false,
         message: 'Cannot reset admin user password'
@@ -354,11 +354,11 @@ exports.resetUserPassword = async (req, res) => {
     user.password = 'sg1234';
     
     // 저장 전 로그
-    logger.logInfo(`Attempting to save new password for user: ${user.studentId}`);
+    logger.info(`Attempting to save new password for user: ${user.studentId}`);
     
     await user.save();
 
-    logger.logInfo(`Password reset successful for user: ${user.studentId} by admin`);
+    logger.info(`Password reset successful for user: ${user.studentId} by admin`);
 
     res.status(200).json({
       success: true,
@@ -369,7 +369,7 @@ exports.resetUserPassword = async (req, res) => {
       }
     });
   } catch (err) {
-    logger.logError('Error resetting user password:', {
+    logger.error('Error resetting user password:', {
       error: err.message,
       stack: err.stack,
       studentId: req.params.id
