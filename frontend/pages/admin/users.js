@@ -22,6 +22,9 @@ export default function AdminUsers() {
   const [dragActive, setDragActive] = useState(false);
   const [csvData, setCsvData] = useState([]);
   const [csvErrors, setCsvErrors] = useState([]);
+  const [selectedCsvUsers, setSelectedCsvUsers] = useState([]); // 선택된 CSV 사용자들
+  const [duplicateUsers, setDuplicateUsers] = useState([]); // 중복 사용자 목록
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false); // 중복 확인 모달
   const [newUserData, setNewUserData] = useState({
     studentId: '',
     name: '',
@@ -303,6 +306,9 @@ export default function AdminUsers() {
 
         setCsvData(data);
         setCsvErrors([]);
+        // 모든 사용자를 기본적으로 선택된 상태로 설정
+        setSelectedCsvUsers(data.map((_, index) => index));
+        setDuplicateUsers([]);
         setShowBulkModal(true);
       } catch (error) {
         console.error('CSV 파싱 오류:', error);
@@ -312,15 +318,100 @@ export default function AdminUsers() {
     reader.readAsText(file);
   };
 
-  const handleBulkSubmit = async () => {
+
+
+  // CSV 사용자 선택 관련 함수들
+  const handleSelectCsvUser = (index) => {
+    setSelectedCsvUsers(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    );
+  };
+
+  const handleSelectAllCsvUsers = () => {
+    if (selectedCsvUsers.length === csvData.length) {
+      setSelectedCsvUsers([]);
+    } else {
+      setSelectedCsvUsers(csvData.map((_, index) => index));
+    }
+  };
+
+  // 중복 사용자 검사 함수
+  const checkDuplicateUsers = (usersToCheck) => {
+    const duplicates = [];
+    const existingStudentIds = users.map(user => user.studentId);
+    
+    usersToCheck.forEach((user, index) => {
+      if (existingStudentIds.includes(user.studentId)) {
+        duplicates.push({
+          ...user,
+          rowIndex: index + 1, // CSV에서 1부터 시작하는 행 번호
+          originalIndex: index
+        });
+      }
+    });
+    
+    return duplicates;
+  };
+
+  // 중복 검사와 함께 업로드 처리
+  const handleBulkSubmitWithDuplicateCheck = async () => {
+    // 선택된 사용자들만 필터링
+    const selectedUsers = selectedCsvUsers.length > 0 
+      ? csvData.filter((_, index) => selectedCsvUsers.includes(index))
+      : csvData;
+
+    if (selectedUsers.length === 0) {
+      toast.error('등록할 사용자를 선택해주세요.');
+      return;
+    }
+
+    // 중복 검사
+    const duplicates = checkDuplicateUsers(selectedUsers);
+    
+    if (duplicates.length > 0) {
+      setDuplicateUsers(duplicates);
+      setShowDuplicateModal(true);
+      return;
+    }
+
+    // 중복이 없으면 바로 등록
+    await proceedWithRegistration(selectedUsers);
+  };
+
+  // 중복 제외하고 등록 진행
+  const proceedWithRegistration = async (usersToRegister = null) => {
     try {
       setIsSubmitting(true);
-      const response = await bulkCreateUsers(csvData);
       
-      toast.success(response.message);
+      let finalUsers;
+      if (usersToRegister) {
+        finalUsers = usersToRegister;
+      } else {
+        // 중복 사용자 제외한 목록 생성
+        const selectedUsers = selectedCsvUsers.length > 0 
+          ? csvData.filter((_, index) => selectedCsvUsers.includes(index))
+          : csvData;
+        
+        const duplicateOriginalIndexes = duplicateUsers.map(dup => dup.originalIndex);
+        finalUsers = selectedUsers.filter((_, index) => !duplicateOriginalIndexes.includes(index));
+      }
+
+      if (finalUsers.length === 0) {
+        toast.error('등록할 수 있는 사용자가 없습니다.');
+        return;
+      }
+
+      const response = await bulkCreateUsers(finalUsers);
+      
+      toast.success(`${finalUsers.length}명의 사용자가 성공적으로 등록되었습니다.`);
       setShowBulkModal(false);
+      setShowDuplicateModal(false);
       setCsvData([]);
       setCsvErrors([]);
+      setSelectedCsvUsers([]);
+      setDuplicateUsers([]);
       await loadUsers();
     } catch (error) {
       console.error('일괄 업로드 오류:', error);
@@ -943,11 +1034,28 @@ export default function AdminUsers() {
             )}
             
             <div className="mb-4">
-              <h3 className="text-lg font-semibold mb-2">미리보기 ({csvData.length}개 행)</h3>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold">미리보기 ({csvData.length}개 행, {selectedCsvUsers.length}개 선택)</h3>
+                <button
+                  type="button"
+                  onClick={handleSelectAllCsvUsers}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  {selectedCsvUsers.length === csvData.length ? '전체 해제' : '전체 선택'}
+                </button>
+              </div>
               <div className="overflow-x-auto max-h-96">
                 <table className="min-w-full divide-y divide-gray-200 border">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <input
+                          type="checkbox"
+                          checked={selectedCsvUsers.length === csvData.length && csvData.length > 0}
+                          onChange={handleSelectAllCsvUsers}
+                          className="rounded"
+                        />
+                      </th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">학번/수험번호</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">이름</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">생년월일</th>
@@ -957,7 +1065,15 @@ export default function AdminUsers() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {csvData.map((row, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
+                      <tr key={index} className={`hover:bg-gray-50 ${selectedCsvUsers.includes(index) ? 'bg-blue-50' : ''}`}>
+                        <td className="px-4 py-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={selectedCsvUsers.includes(index)}
+                            onChange={() => handleSelectCsvUser(index)}
+                            className="rounded"
+                          />
+                        </td>
                         <td className="px-4 py-2 text-sm text-gray-900">{row.studentId || '-'}</td>
                         <td className="px-4 py-2 text-sm text-gray-900">{row.name || '-'}</td>
                         <td className="px-4 py-2 text-sm text-gray-900">{row.birthdate || '-'}</td>
@@ -977,6 +1093,8 @@ export default function AdminUsers() {
                   setShowBulkModal(false);
                   setCsvData([]);
                   setCsvErrors([]);
+                  setSelectedCsvUsers([]);
+                  setDuplicateUsers([]);
                 }}
                 className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
               >
@@ -984,11 +1102,95 @@ export default function AdminUsers() {
               </button>
               <button
                 type="button"
-                onClick={handleBulkSubmit}
+                onClick={handleBulkSubmitWithDuplicateCheck}
                 className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                disabled={isSubmitting || csvErrors.length > 0}
+                disabled={isSubmitting || csvErrors.length > 0 || selectedCsvUsers.length === 0}
               >
-                {isSubmitting ? '업로드 중...' : `${csvData.length}명 일괄 등록`}
+                {isSubmitting ? '업로드 중...' : `선택된 ${selectedCsvUsers.length}명 일괄 등록`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 중복 사용자 확인 모달 */}
+      {showDuplicateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4 text-orange-600">중복 사용자 발견</h2>
+            
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-orange-800">중복된 사용자가 발견되었습니다</h3>
+                  <div className="mt-2 text-sm text-orange-700">
+                    <p>다음 사용자들은 이미 시스템에 등록되어 있습니다:</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold mb-2">중복된 사용자 목록</h3>
+              <div className="overflow-x-auto max-h-60">
+                <table className="min-w-full divide-y divide-gray-200 border">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">행 번호</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">학번/수험번호</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">이름</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {duplicateUsers.map((user, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm text-gray-900">행 {user.rowIndex}</td>
+                        <td className="px-4 py-2 text-sm text-gray-900">{user.studentId}</td>
+                        <td className="px-4 py-2 text-sm text-gray-900">{user.name}</td>
+                        <td className="px-4 py-2 text-sm">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                            중복됨
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>중복된 사용자를 제외하고 등록하시겠습니까?</strong>
+                <br />
+                중복된 사용자들은 기존 데이터를 유지하고, 새로운 사용자들만 추가됩니다.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDuplicateModal(false);
+                  setDuplicateUsers([]);
+                }}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => proceedWithRegistration()}
+                className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? '등록 중...' : '중복 제외하고 등록'}
               </button>
             </div>
           </div>
