@@ -21,7 +21,10 @@ export default function AdminDashboard() {
     availableSeats: 0,
     totalUsers: 0,
     totalTimeSlots: 0,
-    seatsByType: { 석사: 0, 박사: 0 },
+    seatsByType: { 
+      석사: { total: 0, assigned: 0, confirmed: 0, available: 0 }, 
+      박사: { total: 0, assigned: 0, confirmed: 0, available: 0 } 
+    },
     seatsByRoom: {},
     assignmentRate: 0,
     confirmationRate: 0
@@ -96,6 +99,34 @@ export default function AdminDashboard() {
       const validSeats = Array.isArray(seats) ? seats : [];
       const validTimeslots = Array.isArray(timeslots) ? timeslots : [];
 
+      // 방별 통계 계산 (전체, 이용중, 잔여)
+      const seatsByRoom = validSeats.reduce((acc, seat) => {
+        const room = seat.roomNumber || '미분류';
+        if (!acc[room]) {
+          acc[room] = { total: 0, assigned: 0, confirmed: 0 };
+        }
+        acc[room].total += 1;
+        if (seat.assignedTo) acc[room].assigned += 1;
+        if (seat.confirmed) acc[room].confirmed += 1;
+        return acc;
+      }, {});
+
+      // 좌석 유형별 상세 통계 계산 (석사/박사)
+      const seatsByType = validSeats.reduce((acc, seat) => {
+        const type = seat.type || '미분류';
+        if (!acc[type]) {
+          acc[type] = { total: 0, assigned: 0, confirmed: 0, available: 0 };
+        }
+        acc[type].total += 1;
+        if (seat.assignedTo) {
+          acc[type].assigned += 1;
+        } else {
+          acc[type].available += 1;
+        }
+        if (seat.confirmed) acc[type].confirmed += 1;
+        return acc;
+      }, {});
+
       // 상태 업데이트
       setStats({
         totalSeats: validSeats.length,
@@ -104,16 +135,8 @@ export default function AdminDashboard() {
         availableSeats: validSeats.filter(seat => !seat.assignedTo).length,
         totalUsers: validUsers.length,
         totalTimeSlots: validTimeslots.length,
-        seatsByType: validSeats.reduce((acc, seat) => {
-          const type = seat.type || '미분류';
-          acc[type] = (acc[type] || 0) + 1;
-          return acc;
-        }, {}),
-        seatsByRoom: validSeats.reduce((acc, seat) => {
-          const room = seat.roomNumber || '미분류';
-          acc[room] = (acc[room] || 0) + 1;
-          return acc;
-        }, {}),
+        seatsByType,
+        seatsByRoom,
         assignmentRate: validSeats.length > 0 ? Math.round((validSeats.filter(seat => seat.assignedTo).length / validSeats.length) * 100) : 0,
         confirmationRate: validSeats.length > 0 ? Math.round((validSeats.filter(seat => seat.confirmed).length / validSeats.length) * 100) : 0
       });
@@ -239,52 +262,122 @@ export default function AdminDashboard() {
               </div>
 
               {/* 세부 통계 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {/* 좌석 유형별 통계 */}
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">좌석 유형별 현황</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">석사과정 좌석</span>
-                      <span className="font-bold text-blue-600">{stats.seatsByType.석사}개</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">박사과정 좌석</span>
-                      <span className="font-bold text-purple-600">{stats.seatsByType.박사}개</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 가용 좌석 */}
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">좌석 배정 현황</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">사용 가능 좌석</span>
-                      <span className="font-bold text-green-600">{stats.availableSeats}개</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">배정 대기</span>
-                      <span className="font-bold text-orange-600">{stats.assignedSeats - stats.confirmedSeats}개</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 방별 통계 */}
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">방별 배정 현황</h3>
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {Object.entries(stats.seatsByRoom).map(([room, data]) => (
-                      <div key={room} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">{room}호</span>
-                        <span className="font-semibold">
-                          {data.assigned}/{data.total}
-                          <span className="text-xs text-gray-400 ml-1">
-                            ({data.total > 0 ? Math.round((data.assigned/data.total)*100) : 0}%)
-                          </span>
-                        </span>
+              <div className="mb-8">
+                {/* 좌석 유형별 상세 통계 - 전체 너비 사용 */}
+                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">좌석 유형별 상세 현황</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* 석사과정 현황 */}
+                    <div className="border rounded-lg p-4 bg-blue-50">
+                      <h4 className="font-bold text-blue-800 mb-3 flex items-center">
+                        <FaDoorOpen className="mr-2" />
+                        석사과정 좌석
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">전체 좌석</span>
+                          <span className="font-semibold text-blue-600">{stats.seatsByType.석사?.total || 0}개</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">이용중</span>
+                          <span className="font-semibold text-orange-600">{stats.seatsByType.석사?.assigned || 0}개</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">잔여 좌석</span>
+                          <span className="font-semibold text-green-600">{stats.seatsByType.석사?.available || 0}개</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span className="text-gray-600">확정된 좌석</span>
+                          <span className="font-semibold text-red-600">{stats.seatsByType.석사?.confirmed || 0}개</span>
+                        </div>
+                        <div className="text-xs text-gray-500 text-center mt-2 p-2 bg-white rounded">
+                          이용률: {stats.seatsByType.석사?.total > 0 ? Math.round((stats.seatsByType.석사?.assigned / stats.seatsByType.석사?.total) * 100) : 0}%
+                        </div>
                       </div>
-                    ))}
+                    </div>
+                    
+                    {/* 박사과정 현황 */}
+                    <div className="border rounded-lg p-4 bg-purple-50">
+                      <h4 className="font-bold text-purple-800 mb-3 flex items-center">
+                        <FaDoorOpen className="mr-2" />
+                        박사과정 좌석
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">전체 좌석</span>
+                          <span className="font-semibold text-purple-600">{stats.seatsByType.박사?.total || 0}개</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">이용중</span>
+                          <span className="font-semibold text-orange-600">{stats.seatsByType.박사?.assigned || 0}개</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">잔여 좌석</span>
+                          <span className="font-semibold text-green-600">{stats.seatsByType.박사?.available || 0}개</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span className="text-gray-600">확정된 좌석</span>
+                          <span className="font-semibold text-red-600">{stats.seatsByType.박사?.confirmed || 0}개</span>
+                        </div>
+                        <div className="text-xs text-gray-500 text-center mt-2 p-2 bg-white rounded">
+                          이용률: {stats.seatsByType.박사?.total > 0 ? Math.round((stats.seatsByType.박사?.assigned / stats.seatsByType.박사?.total) * 100) : 0}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 하단 통계 영역 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* 전체 배정 현황 */}
+                  <div className="bg-white rounded-lg shadow-md p-6">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">전체 배정 현황</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">사용 가능 좌석</span>
+                        <span className="font-bold text-green-600">{stats.availableSeats}개</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">배정 대기</span>
+                        <span className="font-bold text-orange-600">{stats.assignedSeats - stats.confirmedSeats}개</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">전체 배정률</span>
+                        <span className="font-bold text-blue-600">{stats.assignmentRate}%</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">전체 확정률</span>
+                        <span className="font-bold text-red-600">{stats.confirmationRate}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 방별 배정 현황 */}
+                  <div className="bg-white rounded-lg shadow-md p-6">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">방별 배정 현황</h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {Object.keys(stats.seatsByRoom).length === 0 ? (
+                        <p className="text-gray-500 text-sm text-center py-4">데이터가 없습니다</p>
+                      ) : (
+                        Object.entries(stats.seatsByRoom)
+                          .sort(([roomA], [roomB]) => roomA.localeCompare(roomB))
+                          .map(([room, data]) => (
+                            <div key={room} className="border-b pb-2 mb-2 last:border-b-0">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-700">{room}호</span>
+                                <span className="text-xs text-gray-500">
+                                  이용률: {data.total > 0 ? Math.round((data.assigned/data.total)*100) : 0}%
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-600 mt-1">
+                                <span className="mr-3">전체: {data.total}개</span>
+                                <span className="mr-3">이용중: {data.assigned}개</span>
+                                <span>잔여: {data.total - data.assigned}개</span>
+                              </div>
+                            </div>
+                          ))
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
