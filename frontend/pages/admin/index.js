@@ -96,8 +96,25 @@ export default function AdminDashboard() {
 
       // 데이터 검증 및 기본값 설정
       const validUsers = Array.isArray(users) ? users : [];
-      const validSeats = Array.isArray(seats) ? seats : [];
+      const allSeats = Array.isArray(seats) ? seats : [];
+      // 실제 좌석만 필터링 (objectType이 있는 오브젝트들은 제외)
+      const validSeats = allSeats.filter(seat => !seat.objectType);
       const validTimeslots = Array.isArray(timeslots) ? timeslots : [];
+
+      // 디버깅: 필터링 결과 로깅
+      if (process.env.NODE_ENV === 'development') {
+        const filteredObjects = allSeats.filter(seat => seat.objectType);
+        console.log('관리자 대시보드 - 데이터 필터링 결과:', {
+          전체_데이터: allSeats.length,
+          실제_좌석: validSeats.length,
+          필터링된_오브젝트: filteredObjects.length,
+          오브젝트_목록: filteredObjects.map(obj => ({ 
+            type: obj.objectType, 
+            name: obj.objectName, 
+            room: obj.roomNumber 
+          }))
+        });
+      }
 
       // 방별 통계 계산 (전체, 이용중, 잔여)
       const seatsByRoom = validSeats.reduce((acc, seat) => {

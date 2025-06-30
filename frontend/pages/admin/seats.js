@@ -12,6 +12,7 @@ import { ClientOnly } from '../../utils/client-only';
 export default function AdminSeats() {
   const [activeTab, setActiveTab] = useState('grid'); // grid, assignments, management
   const [seats, setSeats] = useState([]);
+  const [allSeatsWithObjects, setAllSeatsWithObjects] = useState([]); // SeatGrid용 (오브젝트 포함)
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -73,19 +74,41 @@ export default function AdminSeats() {
   const loadSeats = async () => {
     try {
       const response = await getSeats();
-      let seats = [];
+      let allSeats = [];
       
       if (response?.data?.data && Array.isArray(response.data.data)) {
-        seats = response.data.data;
+        allSeats = response.data.data;
       } else if (response?.data && Array.isArray(response.data)) {
-        seats = response.data;
+        allSeats = response.data;
       } else if (response?.success === false) {
         console.error('좌석 데이터 접근 실패:', response.message);
         toast.error(response.message || '좌석 데이터에 접근할 수 없습니다.');
         return;
       }
       
-      setSeats(seats);
+      // 실제 좌석만 필터링 (objectType이 있는 오브젝트들은 제외)
+      const realSeats = allSeats.filter(seat => !seat.objectType);
+      
+      // 개발 환경에서 필터링 결과 로깅
+      if (process.env.NODE_ENV === 'development') {
+        const filteredObjects = allSeats.filter(seat => seat.objectType);
+        console.log('좌석 관리 페이지 - 데이터 필터링 결과:', {
+          전체_데이터: allSeats.length,
+          실제_좌석: realSeats.length,
+          필터링된_오브젝트: filteredObjects.length,
+          오브젝트_목록: filteredObjects.map(obj => ({ 
+            type: obj.objectType, 
+            name: obj.objectName, 
+            room: obj.roomNumber,
+            number: obj.number
+          }))
+        });
+      }
+      
+      // 실제 좌석만 저장 (테이블 등에 사용)
+      setSeats(realSeats);
+      // 오브젝트 포함 전체 데이터 저장 (SeatGrid 레이아웃 표시용)
+      setAllSeatsWithObjects(allSeats);
     } catch (error) {
       console.error('좌석 로드 오류:', error);
       toast.error('좌석 정보를 불러오는 중 오류가 발생했습니다.');
@@ -240,7 +263,7 @@ export default function AdminSeats() {
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-xl font-bold mb-4">좌석 배치도</h2>
               <SeatGrid 
-                seats={seats} 
+                seats={allSeatsWithObjects} 
                 onSeatUpdate={loadAllData} 
                 isAdmin={true} 
               />
