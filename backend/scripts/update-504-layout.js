@@ -6,37 +6,29 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 
-// 환경 변수 로드
-dotenv.config({ path: './.env' });
+// Load environment variables  
+dotenv.config();
 
-// MongoDB 연결
-const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
-    console.log(`MongoDB 연결 성공: ${conn.connection.host}`);
-    return conn;
-  } catch (error) {
-    console.error(`MongoDB 연결 오류: ${error.message}`);
-    process.exit(1);
-  }
-};
+// Import models
+const Seat = require('../models/Seat');
 
-// 504호 좌석 레이아웃 업데이트 함수
-const updateLayout = async () => {
+// Database connection
+const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/seatmgmt';
+
+async function update504Layout() {
   try {
-    // MongoDB 연결
-    const conn = await connectDB();
-    const db = conn.connection.db;
-    const seatsCollection = db.collection('seats');
-    
-    // 기존 504호 좌석 삭제
-    const deleteResult = await seatsCollection.deleteMany({ 
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+    // 기존 504호 및 504A호 좌석들 삭제
+    const deleteResult = await Seat.deleteMany({ 
       roomNumber: { $in: ['504', '504A'] } 
     });
-    console.log(`기존 504호 및 504A호 좌석 ${deleteResult.deletedCount}개를 삭제했습니다.`);
-    
-    // 새로운 504호 좌석 레이아웃 구성
-    const layoutData = [
+
+    // 새로운 504호 레이아웃 데이터
+    const new504Seats = [
       // 일반 좌석
       { number: '1', row: 0, col: 0 },
       { number: '2', row: 0, col: 1 },
@@ -80,7 +72,7 @@ const updateLayout = async () => {
     
     // 모든 아이템 합치기
     const allItems = [
-      ...layoutData.map(seat => ({
+      ...new504Seats.map(seat => ({
         number: seat.number,
         section: '504',
         roomNumber: '504',
@@ -111,22 +103,16 @@ const updateLayout = async () => {
       }))
     ];
     
-    // 새 좌석 및 오브젝트 데이터 삽입
-    if (allItems.length > 0) {
-      const insertResult = await seatsCollection.insertMany(allItems);
-      console.log(`${insertResult.insertedCount}개의 504호 아이템을 생성했습니다.`);
-    }
-    
-    console.log('504호 좌석 레이아웃 업데이트가 완료되었습니다.');
-    
-    // 연결 종료
-    await mongoose.connection.close();
-    
+    // 새 좌석 데이터 삽입
+    const insertResult = await Seat.insertMany(allItems);
+
   } catch (error) {
     console.error(`좌석 레이아웃 업데이트 오류: ${error.message}`);
     process.exit(1);
+  } finally {
+    await mongoose.disconnect();
   }
-};
+}
 
 // 스크립트 실행
-updateLayout(); 
+update504Layout(); 

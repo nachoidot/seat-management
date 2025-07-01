@@ -7,7 +7,6 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // MongoDB 연결 설정
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/seatmgmt';
-console.log('MongoDB 연결 문자열:', mongoUri);
 
 // 좌석 데이터 - 이미지에 보이는 배치도 기반
 const seatsData = [
@@ -163,34 +162,24 @@ async function seedDatabase() {
   try {
     // MongoDB 연결
     await mongoose.connect(mongoUri);
-    console.log('MongoDB에 연결되었습니다.');
 
     // 모델 불러오기
     const Seat = require('../models/Seat');
     const TimeSlot = require('../models/TimeSlot');
 
     // 컬렉션 초기화 (기존 데이터 삭제)
-    console.log('기존 좌석 데이터 삭제 중...');
     await Seat.deleteMany({});
-    console.log('기존 일정 데이터 삭제 중...');
     await TimeSlot.deleteMany({});
 
     // 새 데이터 삽입
-    console.log('새 좌석 데이터 삽입 중...');
     await Seat.insertMany(seatsData);
-    console.log(`${seatsData.length}개의 좌석 데이터가 삽입되었습니다.`);
-
-    console.log('새 일정 데이터 삽입 중...');
     await TimeSlot.insertMany(timeSlotData);
-    console.log(`${timeSlotData.length}개의 일정 데이터가 삽입되었습니다.`);
 
-    console.log('데이터 초기화가 완료되었습니다.');
   } catch (error) {
-    console.error('데이터베이스 초기화 오류:', error);
+    // 오류 처리
   } finally {
     // 연결 종료
     await mongoose.connection.close();
-    console.log('MongoDB 연결이 종료되었습니다.');
   }
 }
 

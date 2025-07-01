@@ -25,6 +25,7 @@ export default function AdminUsers() {
   const [selectedCsvUsers, setSelectedCsvUsers] = useState([]); // 선택된 CSV 사용자들
   const [duplicateUsers, setDuplicateUsers] = useState([]); // 중복 사용자 목록
   const [showDuplicateModal, setShowDuplicateModal] = useState(false); // 중복 확인 모달
+  const [duplicateAction, setDuplicateAction] = useState('skip'); // 중복 처리 방식: skip, update, error
   const [newUserData, setNewUserData] = useState({
     studentId: '',
     name: '',
@@ -371,54 +372,49 @@ export default function AdminUsers() {
     const duplicates = checkDuplicateUsers(selectedUsers);
     
     if (duplicates.length > 0) {
+      // 중복이 발견되면 중복 처리 모달 표시
       setDuplicateUsers(duplicates);
       setShowDuplicateModal(true);
       return;
     }
 
-    // 중복이 없으면 바로 등록
-    await proceedWithRegistration(selectedUsers);
+    // 중복이 없으면 바로 등록 (기본값: skip)
+    await proceedWithRegistration('skip');
   };
 
-  // 중복 제외하고 등록 진행
-  const proceedWithRegistration = async (usersToRegister = null) => {
+  // 중복 처리 방식에 따라 등록 진행
+  const proceedWithRegistration = async (action = duplicateAction) => {
     try {
       setIsSubmitting(true);
       
-      let finalUsers;
-      if (usersToRegister) {
-        finalUsers = usersToRegister;
-      } else {
-        // 중복 사용자 제외한 목록 생성
-        const selectedUsers = selectedCsvUsers.length > 0 
-          ? csvData.filter((_, index) => selectedCsvUsers.includes(index))
-          : csvData;
-        
-        const duplicateOriginalIndexes = duplicateUsers.map(dup => dup.originalIndex);
-        finalUsers = selectedUsers.filter((_, index) => !duplicateOriginalIndexes.includes(index));
-      }
+      // 선택된 사용자들 가져오기
+      const selectedUsers = selectedCsvUsers.length > 0 
+        ? csvData.filter((_, index) => selectedCsvUsers.includes(index))
+        : csvData;
 
-      if (finalUsers.length === 0) {
-        toast.error('등록할 수 있는 사용자가 없습니다.');
+      if (selectedUsers.length === 0) {
+        toast.error('등록할 사용자를 선택해주세요.');
         return;
       }
 
-      const response = await bulkCreateUsers(finalUsers);
+      const response = await bulkCreateUsers(selectedUsers, action);
       
-      toast.success(`${finalUsers.length}명의 사용자가 성공적으로 등록되었습니다.`);
+      toast.success(response.message || '처리가 완료되었습니다.');
       setShowBulkModal(false);
       setShowDuplicateModal(false);
       setCsvData([]);
       setCsvErrors([]);
       setSelectedCsvUsers([]);
       setDuplicateUsers([]);
+      setDuplicateAction('skip');
       await loadUsers();
     } catch (error) {
       console.error('일괄 업로드 오류:', error);
       if (error.response?.data?.errors) {
         setCsvErrors(error.response.data.errors);
       } else {
-        toast.error(error.response?.data?.message || '일괄 업로드 중 오류가 발생했습니다.');
+        const errorMessage = error.response?.data?.message || '일괄 업로드 중 오류가 발생했습니다.';
+        toast.error(errorMessage);
       }
     } finally {
       setIsSubmitting(false);
@@ -1095,6 +1091,7 @@ export default function AdminUsers() {
                   setCsvErrors([]);
                   setSelectedCsvUsers([]);
                   setDuplicateUsers([]);
+                  setDuplicateAction('skip');
                 }}
                 className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
               >
@@ -1106,7 +1103,7 @@ export default function AdminUsers() {
                 className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
                 disabled={isSubmitting || csvErrors.length > 0 || selectedCsvUsers.length === 0}
               >
-                {isSubmitting ? '업로드 중...' : `선택된 ${selectedCsvUsers.length}명 일괄 등록`}
+                {isSubmitting ? '처리 중...' : `선택된 ${selectedCsvUsers.length}명 일괄 등록`}
               </button>
             </div>
           </div>
@@ -1166,11 +1163,54 @@ export default function AdminUsers() {
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">
-                <strong>중복된 사용자를 제외하고 등록하시겠습니까?</strong>
-                <br />
-                중복된 사용자들은 기존 데이터를 유지하고, 새로운 사용자들만 추가됩니다.
-              </p>
+              <h4 className="text-sm font-medium text-blue-800 mb-3">중복 처리 방식을 선택하세요:</h4>
+              
+              <div className="space-y-3">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="duplicateAction"
+                    value="skip"
+                    checked={duplicateAction === 'skip'}
+                    onChange={(e) => setDuplicateAction(e.target.value)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-blue-800">중복 사용자 건너뛰기 (권장)</div>
+                    <div className="text-xs text-blue-600">기존 사용자 정보를 유지하고, 중복되지 않은 새로운 사용자만 추가합니다.</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="duplicateAction"
+                    value="update"
+                    checked={duplicateAction === 'update'}
+                    onChange={(e) => setDuplicateAction(e.target.value)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-blue-800">기존 사용자 정보 업데이트</div>
+                    <div className="text-xs text-blue-600">기존 사용자의 정보를 CSV의 새로운 정보로 덮어씁니다. 비밀번호도 초기화됩니다.</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="duplicateAction"
+                    value="error"
+                    checked={duplicateAction === 'error'}
+                    onChange={(e) => setDuplicateAction(e.target.value)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-blue-800">중복 시 오류 처리</div>
+                    <div className="text-xs text-blue-600">중복된 사용자가 있으면 전체 등록을 취소하고 오류 메시지를 표시합니다.</div>
+                  </div>
+                </label>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-2">
@@ -1179,6 +1219,7 @@ export default function AdminUsers() {
                 onClick={() => {
                   setShowDuplicateModal(false);
                   setDuplicateUsers([]);
+                  setDuplicateAction('skip');
                 }}
                 className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
               >
@@ -1186,11 +1227,11 @@ export default function AdminUsers() {
               </button>
               <button
                 type="button"
-                onClick={() => proceedWithRegistration()}
+                onClick={() => proceedWithRegistration(duplicateAction)}
                 className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? '등록 중...' : '중복 제외하고 등록'}
+                {isSubmitting ? '처리 중...' : '선택한 방식으로 처리'}
               </button>
             </div>
           </div>

@@ -6,13 +6,13 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 // 개발환경에서만 로그 출력
 const log = (message, ...args) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log(message, ...args);
+    // console.log 제거
   }
 };
 
 const logError = (message, ...args) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log(message, ...args);
+    // console.log 제거
   }
 };
 
@@ -22,7 +22,7 @@ const logError = (message, ...args) => {
 export const wakeUpServer = async (maxRetries = 5) => {
   if (typeof window === 'undefined') return true; // SSR에서는 실행하지 않음
   
-  console.log('🤖 서버 Wake-up 시도 중...');
+  // console.log 제거
   
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -34,22 +34,22 @@ export const wakeUpServer = async (maxRetries = 5) => {
       });
       
       if (response.status === 200 && response.data) {
-        console.log(`✅ 서버 깨우기 성공! (시도 ${i + 1}/${maxRetries})`, response.data.message);
+        // console.log 제거
         return true;
       }
     } catch (error) {
-      console.log(`⏰ 서버 Wake-up 시도 ${i + 1}/${maxRetries} 실패:`, error.message);
+      // console.log 제거
       
       if (i < maxRetries - 1) {
         // 재시도 전 대기 시간 (점진적 증가)
         const waitTime = Math.min(1000 * (i + 1), 5000);
-        console.log(`🔄 ${waitTime}ms 후 재시도...`);
+        // console.log 제거
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
   }
   
-  console.log('❌ 서버 Wake-up 실패. 서버가 응답하지 않습니다.');
+  // console.log 제거
   return false;
 };
 
@@ -103,18 +103,14 @@ export const autoWakeUpOnLoad = () => {
   
   // 페이지 로드 시 즉시 Wake-up 시도
   wakeUpServer(2).then(success => {
-    if (success) {
-      console.log('🚀 페이지 로드 시 서버 Wake-up 완료');
-    }
+    // console.log 제거
   });
   
   // Visibility API를 이용해 탭이 다시 활성화될 때 Wake-up
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       wakeUpServer(1).then(success => {
-        if (success) {
-          console.log('👁️ 탭 활성화 시 서버 Wake-up 완료');
-        }
+        // console.log 제거
       });
     }
   });

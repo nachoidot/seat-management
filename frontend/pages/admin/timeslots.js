@@ -180,7 +180,6 @@ export default function AdminTimeSlots() {
 
   const handleUpdateTimeSlot = async (e) => {
     e.preventDefault();
-    console.log('일정 수정 시작:', newTimeSlotData);
     
     if (!newTimeSlotData.title || !newTimeSlotData.baseDate || !newTimeSlotData.endDate) {
       toast.error('제목, 배정일, 종료일을 모두 입력해주세요.');
@@ -194,18 +193,10 @@ export default function AdminTimeSlots() {
     
     try {
       setIsSubmitting(true);
-      console.log('일정 수정 API 호출 전:', newTimeSlotData);
       
       // 날짜 형식이 문제일 수 있으므로 ISO 문자열로 변환
       const baseDate = new Date(newTimeSlotData.baseDate);
       const endDate = new Date(newTimeSlotData.endDate);
-      
-      console.log('변환된 날짜:', {
-        baseDate,
-        endDate,
-        baseDateString: baseDate.toISOString(),
-        endDateString: endDate.toISOString(),
-      });
       
       const timeSlotData = {
         title: newTimeSlotData.title,
@@ -215,13 +206,10 @@ export default function AdminTimeSlots() {
         active: newTimeSlotData.active
       };
       
-      console.log('API 호출 데이터:', timeSlotData);
       const result = await updateTimeSlot(selectedTimeSlot._id, timeSlotData);
-      console.log('일정 수정 결과:', result);
       
       toast.success('일정이 업데이트되었습니다.');
       setShowEditModal(false);
-      console.log('일정 목록 다시 로드');
       await loadTimeSlots();
     } catch (error) {
       console.error('일정 업데이트 오류 상세:', error);
@@ -229,7 +217,6 @@ export default function AdminTimeSlots() {
       toast.error(error.response?.data?.message || '일정 업데이트 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);
-      console.log('일정 수정 처리 완료');
     }
   };
 
@@ -370,7 +357,6 @@ export default function AdminTimeSlots() {
             </div>
           ) : (
             <>
-              {console.log('타임슬롯 렌더링 상태:', { 타임슬롯개수: timeSlots.length, 타임슬롯: timeSlots })}
               {timeSlots.length === 0 ? (
                 <div className="bg-white rounded-lg shadow-md p-8 text-center">
                   <p className="text-gray-600 text-lg mb-4">등록된 일정이 없습니다</p>

@@ -31,7 +31,6 @@ export const isAuthenticated = async () => {
 
   try {
     const response = await getMe();
-    console.log(`Frist block res: ${response}`);
     return response.success && response.user;
   } catch (error) {
     return false;
@@ -49,7 +48,6 @@ export const getCurrentUser = async () => {
 
   try {
     const response = await getMe();
-    console.log(`Second block res: ${response}`);
     return response.success ? response.user : null;
   } catch (error) {
     return null;

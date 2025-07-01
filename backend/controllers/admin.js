@@ -2,6 +2,7 @@ const Seat = require('../models/Seat');
 const User = require('../models/User');
 const AdminInfo = require('../models/AdminInfo');
 const XLSX = require('xlsx');
+const bcrypt = require('bcryptjs');
 const logger = require('../utils/logger');
 
 // 입력값 검증 헬퍼 함수들
@@ -589,7 +590,7 @@ exports.createBatchSeats = async (req, res) => {
 // @access  Private (Admin only)
 exports.bulkCreateUsers = async (req, res) => {
   try {
-    const { users } = req.body;
+    const { users, duplicateAction = 'skip' } = req.body; // skip, update, error
 
     if (!users || !Array.isArray(users) || users.length === 0) {
       return res.status(400).json({
@@ -650,17 +651,34 @@ exports.bulkCreateUsers = async (req, res) => {
 
     // 두 번째 패스: 모든 학번을 한 번의 쿼리로 중복 검사 (성능 최적화)
     const studentIds = validUsers.map(user => user.studentId);
-    const existingUsers = await User.find({ studentId: { $in: studentIds } }, 'studentId');
+    const existingUsers = await User.find({ studentId: { $in: studentIds } });
     const existingStudentIds = new Set(existingUsers.map(user => user.studentId));
 
-    // 중복 검사 결과 반영
+    // 중복 처리 로직
     const finalValidUsers = [];
+    const usersToUpdate = [];
+    let duplicateCount = 0;
+
     for (const user of validUsers) {
       if (existingStudentIds.has(user.studentId)) {
-        errors.push(`행 ${user.rowNum}: 학번/수험번호 ${user.studentId}는 이미 존재합니다`);
-        continue;
+        duplicateCount++;
+        
+        if (duplicateAction === 'error') {
+          // 중복 시 에러 처리
+          errors.push(`행 ${user.rowNum}: 학번/수험번호 ${user.studentId}는 이미 존재합니다`);
+          continue;
+        } else if (duplicateAction === 'update') {
+          // 기존 사용자 업데이트
+          const { rowNum, ...userWithoutRowNum } = user;
+          usersToUpdate.push(userWithoutRowNum);
+          continue;
+        } else {
+          // duplicateAction === 'skip' - 중복 건너뛰기 (기본값)
+          continue;
+        }
       }
-      // rowNum은 DB 저장 시 제외
+      
+      // 새로운 사용자 추가
       const { rowNum, ...userWithoutRowNum } = user;
       finalValidUsers.push(userWithoutRowNum);
     }
@@ -673,21 +691,68 @@ exports.bulkCreateUsers = async (req, res) => {
       });
     }
 
-    if (finalValidUsers.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: '유효한 사용자 데이터가 없습니다'
-      });
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    // 새로운 사용자 생성
+    if (finalValidUsers.length > 0) {
+      // 각 사용자의 비밀번호를 미리 해시화 (insertMany는 pre-save 미들웨어를 실행하지 않음)
+      for (const user of finalValidUsers) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
+      }
+
+      const createdUsers = await User.insertMany(finalValidUsers);
+      createdCount = createdUsers.length;
     }
 
-    // 사용자 일괄 생성
-    const createdUsers = await User.insertMany(finalValidUsers);
+    // 기존 사용자 업데이트
+    if (usersToUpdate.length > 0) {
+      for (const user of usersToUpdate) {
+        // 비밀번호 해시화
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(user.password, salt);
+        
+        await User.updateOne(
+          { studentId: user.studentId },
+          {
+            name: user.name,
+            password: hashedPassword,
+            birthdate: user.birthdate,
+            priority: user.priority,
+            isAdmin: user.isAdmin,
+            updatedAt: Date.now()
+          }
+        );
+        updatedCount++;
+      }
+    }
+
+    // 결과 메시지 생성
+    let message = '';
+    if (createdCount > 0 && updatedCount > 0) {
+      message = `${createdCount}명이 새로 등록되고 ${updatedCount}명이 업데이트되었습니다`;
+    } else if (createdCount > 0) {
+      message = `${createdCount}명의 사용자가 성공적으로 등록되었습니다`;
+    } else if (updatedCount > 0) {
+      message = `${updatedCount}명의 사용자가 업데이트되었습니다`;
+    } else {
+      message = '처리된 사용자가 없습니다';
+    }
+
+    if (duplicateCount > 0 && duplicateAction === 'skip') {
+      message += ` (${duplicateCount}명의 중복 사용자는 건너뛰었습니다)`;
+    }
 
     res.status(201).json({
       success: true,
-      message: `${createdUsers.length}명의 사용자가 성공적으로 등록되었습니다`,
-      count: createdUsers.length,
-      data: createdUsers
+      message: message,
+      data: {
+        created: createdCount,
+        updated: updatedCount,
+        duplicates: duplicateCount,
+        action: duplicateAction
+      }
     });
 
   } catch (err) {

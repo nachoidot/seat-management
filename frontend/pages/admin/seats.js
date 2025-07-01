@@ -89,21 +89,7 @@ export default function AdminSeats() {
       // 실제 좌석만 필터링 (objectType이 있는 오브젝트들은 제외)
       const realSeats = allSeats.filter(seat => !seat.objectType);
       
-      // 개발 환경에서 필터링 결과 로깅
-      if (process.env.NODE_ENV === 'development') {
-        const filteredObjects = allSeats.filter(seat => seat.objectType);
-        console.log('좌석 관리 페이지 - 데이터 필터링 결과:', {
-          전체_데이터: allSeats.length,
-          실제_좌석: realSeats.length,
-          필터링된_오브젝트: filteredObjects.length,
-          오브젝트_목록: filteredObjects.map(obj => ({ 
-            type: obj.objectType, 
-            name: obj.objectName, 
-            room: obj.roomNumber,
-            number: obj.number
-          }))
-        });
-      }
+
       
       // 실제 좌석만 저장 (테이블 등에 사용)
       setSeats(realSeats);
@@ -221,10 +207,8 @@ export default function AdminSeats() {
   const handleBulkConfirm = async (type, options = {}) => {
     try {
       setIsSubmitting(true);
-      console.log('일괄 확정 시작:', { type, options });
       
       const response = await bulkConfirmSeats(options);
-      console.log('일괄 확정 응답:', response);
       
       toast.success(response.message || '좌석이 확정되었습니다.');
       await loadAllData();

@@ -26,7 +26,6 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
       if (typeof window === 'undefined') return;
       try {
         const userData = await getCurrentUser();
-        console.log('SeatGrid: User data loaded:', userData);
         setUser(userData);
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -56,7 +55,6 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
         // 현재 사용자에게 배정된 좌석 확인
         if (user && user.studentId && seat.assignedTo === user.studentId) {
           foundUserSeat = seat;
-          console.log('SeatGrid: Found user seat:', seat);
           
           // 사용자의 좌석이 있는 방을 기본으로 활성화
           if (filterRoom === null) {
@@ -102,7 +100,6 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
     if (processedSeats.grouped) {
       setRoomGroupedSeats(processedSeats.grouped);
       setUserAssignedSeat(processedSeats.userSeat);
-      console.log('SeatGrid: Updated userAssignedSeat:', processedSeats.userSeat);
       
       if (processedSeats.defaultRoom && !activeRoom) {
         setActiveRoom(processedSeats.defaultRoom);
@@ -192,7 +189,6 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
       
       const confirm = window.confirm(confirmMessage);
       if (confirm) {
-        console.log('Canceling user seat:', seat);
         await handleUnassignSeat(seat, true); // customMessage = true로 중복 토스트 방지
         toast.success(`${seatStatus} 좌석이 취소되었습니다.`);
       }
@@ -207,7 +203,6 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
       
       const confirm = window.confirm(confirmMessage);
       if (confirm) {
-        console.log('Changing seat from', userAssignedSeat, 'to', seat);
         await handleUnassignSeat(userAssignedSeat, true); // 중복 토스트 방지
         await handleAssignSeat(seat);
         // handleAssignSeat에서 성공 메시지를 표시하므로 여기서는 별도 메시지 불필요
@@ -342,7 +337,6 @@ const SeatGrid = memo(({ seats, onSeatUpdate, isAdmin = false, filterRoom = null
       // 내 좌석인지 확인 후 상태 업데이트
       if (user && seat.assignedTo === user.studentId) {
         setUserAssignedSeat(null);
-        console.log('User assigned seat cleared');
       }
       
       if (onSeatUpdate) {

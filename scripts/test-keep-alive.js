@@ -60,32 +60,22 @@ function makeRequest(url, options = {}) {
 
 // 백엔드 Health Check 테스트
 async function testBackendHealth() {
-  console.log('\n🏥 Testing Backend Health...');
-  
   try {
     const response = await makeRequest(`${BACKEND_URL}/api/health`);
     
     if (response.status === 200) {
       const data = JSON.parse(response.data);
-      console.log('✅ Backend Health Check 성공!');
-      console.log(`   - Message: ${data.message}`);
-      console.log(`   - Uptime: ${data.uptime}`);
-      console.log(`   - Environment: ${data.environment}`);
       return true;
     } else {
-      console.log(`❌ Backend Health Check 실패: ${response.status}`);
       return false;
     }
   } catch (error) {
-    console.log(`❌ Backend Health Check 오류: ${error.message}`);
     return false;
   }
 }
 
 // 주요 API 엔드포인트 테스트
 async function testAPIEndpoints() {
-  console.log('\n🔧 Testing API Endpoints...');
-  
   const endpoints = [
     '/api/seats',
     '/api/timeslots',
@@ -96,7 +86,6 @@ async function testAPIEndpoints() {
   
   for (const endpoint of endpoints) {
     try {
-      console.log(`   Testing ${endpoint}...`);
       const response = await makeRequest(`${BACKEND_URL}${endpoint}`);
       
       const success = response.status === 200 || response.status === 401; // 401은 인증 필요한 경우
@@ -105,14 +94,7 @@ async function testAPIEndpoints() {
         status: response.status,
         success
       });
-      
-      if (success) {
-        console.log(`   ✅ ${endpoint} - ${response.status}`);
-      } else {
-        console.log(`   ❌ ${endpoint} - ${response.status}`);
-      }
     } catch (error) {
-      console.log(`   ❌ ${endpoint} - Error: ${error.message}`);
       results.push({
         endpoint,
         status: 'error',
@@ -127,49 +109,30 @@ async function testAPIEndpoints() {
 
 // 프론트엔드 접근성 테스트
 async function testFrontendAccess() {
-  console.log('\n🌐 Testing Frontend Access...');
-  
   try {
     const response = await makeRequest(FRONTEND_URL);
     
     if (response.status === 200) {
-      console.log('✅ Frontend Access 성공!');
-      console.log(`   - Status: ${response.status}`);
-      console.log(`   - Response size: ${response.data.length} bytes`);
       return true;
     } else {
-      console.log(`❌ Frontend Access 실패: ${response.status}`);
       return false;
     }
   } catch (error) {
-    console.log(`❌ Frontend Access 오류: ${error.message}`);
     return false;
   }
 }
 
 // 연속 테스트 (서버 깨우기 시뮬레이션)
 async function testContinuousWakeup(rounds = 3) {
-  console.log(`\n🔄 Testing Continuous Wake-up (${rounds} rounds)...`);
-  
   for (let i = 1; i <= rounds; i++) {
-    console.log(`\n   Round ${i}/${rounds}:`);
-    
     const startTime = Date.now();
     const healthOk = await testBackendHealth();
     const endTime = Date.now();
     
     const responseTime = endTime - startTime;
-    console.log(`   ⏱️ Response time: ${responseTime}ms`);
-    
-    if (healthOk) {
-      console.log(`   ✅ Round ${i} 성공!`);
-    } else {
-      console.log(`   ❌ Round ${i} 실패!`);
-    }
     
     // 다음 라운드 전에 잠시 대기
     if (i < rounds) {
-      console.log('   ⏸️ 5초 대기...');
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
@@ -177,9 +140,6 @@ async function testContinuousWakeup(rounds = 3) {
 
 // 메인 테스트 함수
 async function runTests() {
-  console.log('🤖 Keep-Alive 시스템 테스트 시작...');
-  console.log('='.repeat(50));
-  
   // 1. 백엔드 Health Check
   const healthOk = await testBackendHealth();
   
@@ -192,21 +152,8 @@ async function runTests() {
   // 4. 연속 테스트
   await testContinuousWakeup(3);
   
-  // 결과 요약
-  console.log('\n📊 테스트 결과 요약:');
-  console.log('='.repeat(50));
-  console.log(`🏥 Backend Health: ${healthOk ? '✅ PASS' : '❌ FAIL'}`);
-  console.log(`🌐 Frontend Access: ${frontendOk ? '✅ PASS' : '❌ FAIL'}`);
-  
   const apiSuccess = apiResults.filter(r => r.success).length;
   const apiTotal = apiResults.length;
-  console.log(`🔧 API Endpoints: ${apiSuccess}/${apiTotal} PASS`);
-  
-  if (healthOk && frontendOk && apiSuccess === apiTotal) {
-    console.log('\n🎉 모든 테스트 통과! 무료 Keep-Alive 시스템이 정상 작동합니다.');
-  } else {
-    console.log('\n⚠️ 일부 테스트 실패. 설정을 확인해주세요.');
-  }
 }
 
 // 스크립트 실행

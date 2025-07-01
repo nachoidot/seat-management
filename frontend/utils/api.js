@@ -199,8 +199,8 @@ export const resetUserPassword = async (id) => {
   return response.data;
 };
 
-export const bulkCreateUsers = async (users) => {
-  const response = await api.post('/admin/users/bulk', { users });
+export const bulkCreateUsers = async (users, duplicateAction = 'skip') => {
+  const response = await api.post('/admin/users/bulk', { users, duplicateAction });
   return response.data;
 };
 
@@ -220,13 +220,10 @@ export const resetSeats = async () => {
 
 export const createTimeSlot = async (timeSlotData) => {
   try {
-    console.log('createTimeSlot API 호출:', timeSlotData);
-    
     // 타임슬롯 생성 후 캐시 무효화
     cache.delete('timeslots');
     
     const response = await api.post('/timeslots', timeSlotData);
-    console.log('createTimeSlot 응답:', response);
     return response.data;
   } catch (error) {
     console.error('createTimeSlot 에러:', error);
@@ -238,13 +235,10 @@ export const createTimeSlot = async (timeSlotData) => {
 
 export const updateTimeSlot = async (id, timeSlotData) => {
   try {
-    console.log(`updateTimeSlot API 호출 - ID: ${id}`, timeSlotData);
-    
     // 타임슬롯 수정 후 캐시 무효화
     cache.delete('timeslots');
     
     const response = await api.put(`/timeslots/${id}`, timeSlotData);
-    console.log('updateTimeSlot 응답:', response);
     return response.data;
   } catch (error) {
     console.error('updateTimeSlot 에러:', error);

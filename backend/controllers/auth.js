@@ -9,8 +9,6 @@ const logger = require('../utils/logger');
 exports.login = async (req, res) => {
   try {
     const { studentId, name, password } = req.body;
-    console.log('나여기 있다!!!');
-    console.log(studentId, name, password);
 
     if (!studentId || !name) {
       return res.status(400).json({
