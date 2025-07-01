@@ -214,7 +214,7 @@ export const resetSeats = async () => {
   // 좌석 리셋 후 캐시 무효화
   cache.delete('seats');
   
-  const response = await api.put('/admin/seats/reset');
+  const response = await api.post('/admin/seats/reset');
   return response.data;
 };
 
