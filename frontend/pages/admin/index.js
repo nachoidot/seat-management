@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import Layout from '../../components/Layout';
-import { getSeats, getUsers, getTimeSlots, resetSeats } from '../../utils/api';
+import { getSeats, getUsers, getTimeSlots, resetSeats, exportSeatsToExcel } from '../../utils/api';
 import { useAdmin } from '../../utils/auth';
 import { toast } from 'react-toastify';
 import { FaUsers, FaCalendarAlt, FaChair, FaUndo, FaDownload, FaCheckCircle, FaTimesCircle, FaDoorOpen } from 'react-icons/fa';
@@ -180,9 +180,19 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleExportData = () => {
+  const handleExportData = async () => {
     if (typeof window === 'undefined') return;
-    window.open(`${process.env.NEXT_PUBLIC_API_URL}/admin/seats/export`, '_blank');
+    
+    try {
+      setActionLoading(true);
+      const result = await exportSeatsToExcel();
+      toast.success(result.message);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(error.message || '엑셀 내보내기 중 오류가 발생했습니다.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   if (!isAdmin) {
@@ -430,10 +440,11 @@ export default function AdminDashboard() {
                   
                   <button
                     onClick={handleExportData}
-                    className="flex items-center justify-center px-4 py-2 bg-primary text-white rounded hover:bg-blue-700 transition-colors"
+                    disabled={actionLoading}
+                    className="flex items-center justify-center px-4 py-2 bg-primary text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     <FaDownload className="mr-2" />
-                    엑셀로 내보내기
+                    {actionLoading ? '내보내는 중...' : '엑셀로 내보내기'}
                   </button>
                 </div>
               </div>

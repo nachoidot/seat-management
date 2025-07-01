@@ -3,10 +3,10 @@ import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import AdminNav from '../../components/AdminNav';
 import SeatGrid from '../../components/SeatGrid';
-import { getSeats, createBatchSeats, resetSeats, bulkConfirmSeats, getSeatAssignmentStats, getUsers } from '../../utils/api';
+import { getSeats, createBatchSeats, resetSeats, bulkConfirmSeats, getSeatAssignmentStats, getUsers, exportSeatsToExcel } from '../../utils/api';
 import { useAdmin } from '../../utils/auth';
 import { toast } from 'react-toastify';
-import { FaPlus, FaTrash, FaEdit, FaUndo, FaCheck, FaCheckCircle, FaClock, FaUsers } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaEdit, FaUndo, FaCheck, FaCheckCircle, FaClock, FaUsers, FaDownload } from 'react-icons/fa';
 import { ClientOnly } from '../../utils/client-only';
 
 export default function AdminSeats() {
@@ -199,6 +199,19 @@ export default function AdminSeats() {
     } catch (error) {
       console.error('좌석 초기화 오류:', error);
       toast.error('좌석 초기화 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    try {
+      setIsSubmitting(true);
+      const result = await exportSeatsToExcel();
+      toast.success(result.message);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(error.message || '엑셀 내보내기 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);
     }
@@ -509,6 +522,14 @@ export default function AdminSeats() {
                 className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center"
               >
                 <FaPlus className="mr-2" /> 좌석 추가
+              </button>
+              <button
+                onClick={handleExportData}
+                disabled={isSubmitting}
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                <FaDownload className="mr-2" />
+                {isSubmitting ? '내보내는 중...' : '엑셀로 내보내기'}
               </button>
               <button 
                 onClick={() => setShowResetModal(true)}

@@ -285,6 +285,42 @@ export const updateAdminInfo = async (adminInfo) => {
   return response.data;
 };
 
+// 엑셀 내보내기 (토큰 인증 포함)
+export const exportSeatsToExcel = async () => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('인증 토큰이 없습니다. 다시 로그인해주세요.');
+  }
+
+  const response = await fetch(`${API_URL}/admin/seats/export`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: '파일 다운로드에 실패했습니다.' }));
+    throw new Error(errorData.message || '파일 다운로드에 실패했습니다.');
+  }
+
+  // blob으로 변환
+  const blob = await response.blob();
+  
+  // 파일 다운로드
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `seat_assignments_${new Date().toISOString().split('T')[0]}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+  
+  return { success: true, message: '엑셀 파일이 다운로드되었습니다.' };
+};
+
 // 캐시 수동 무효화 함수 (필요시 사용)
 export const invalidateCache = (key = null) => {
   if (key) {

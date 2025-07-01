@@ -436,12 +436,16 @@ exports.resetAllSeats = async (req, res) => {
 // @access  Private (Admin only)
 exports.exportSeats = async (req, res) => {
   try {
-    // Fetch all seats with assignments
-    const seats = await Seat.find().sort({ seatId: 1 });
+    logger.info('엑셀 내보내기 요청 받음');
+    
+    // Fetch all seats with assignments (실제 좌석만 필터링)
+    const seats = await Seat.find({ objectType: { $exists: false } }).sort({ roomNumber: 1, number: 1 });
+    logger.info(`좌석 데이터 조회 완료: ${seats.length}개`);
     
     // Create a map of student IDs to fetch user details
     const studentIds = [...new Set(seats.filter(seat => seat.assignedTo).map(seat => seat.assignedTo))];
     const users = await User.find({ studentId: { $in: studentIds } });
+    logger.info(`사용자 데이터 조회 완료: ${users.length}명`);
     
     const userMap = {};
     users.forEach(user => {
@@ -452,34 +456,47 @@ exports.exportSeats = async (req, res) => {
     const data = seats.map(seat => {
       const user = seat.assignedTo ? userMap[seat.assignedTo] : null;
       return {
-        'Seat ID': seat.seatId,
-        'Row': seat.row,
-        'Column': seat.col,
-        'Assigned To': seat.assignedTo || '',
-        'Student Name': user ? user.name : '',
-        'Priority': user ? user.priority : '',
-        'Confirmed': seat.confirmed ? 'Yes' : 'No',
-        'Updated At': seat.updatedAt.toISOString().split('T')[0]
+        '방번호': seat.roomNumber || '',
+        '좌석번호': seat.number || seat.seatId || '',
+        '좌석유형': seat.type || '',
+        '배정학번': seat.assignedTo || '',
+        '학생이름': user ? user.name : '',
+        '우선순위': user ? user.priority : '',
+        '확정여부': seat.confirmed ? '확정' : seat.assignedTo ? '대기' : '미배정',
+        '업데이트일': seat.updatedAt ? seat.updatedAt.toISOString().split('T')[0] : ''
       };
     });
+
+    logger.info(`엑셀 데이터 준비 완료: ${data.length}행`);
 
     // Create Excel workbook
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Seats');
+    
+    // 열 너비 자동 조정
+    const maxWidth = 20;
+    const colWidths = Object.keys(data[0] || {}).map(key => ({ wch: maxWidth }));
+    ws['!cols'] = colWidths;
+    
+    XLSX.utils.book_append_sheet(wb, ws, '좌석배정현황');
 
     // Generate Excel file buffer
     const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    logger.info('엑셀 파일 생성 완료');
 
     // Set headers for download
+    const fileName = `seat_assignments_${new Date().toISOString().split('T')[0]}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=seat_assignments.xlsx');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     
     res.send(excelBuffer);
+    logger.info('엑셀 파일 전송 완료');
   } catch (err) {
+    logger.logError('엑셀 내보내기 오류:', err);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: '엑셀 파일 생성 중 오류가 발생했습니다.',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 };
