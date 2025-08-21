@@ -1,6 +1,9 @@
 const express = require('express');
 const { 
   getUsers, 
+  createUser,
+  updateUser,
+  deleteUser,
   getSeats, 
   resetAllSeats, 
   exportSeats,
@@ -25,6 +28,9 @@ router.use(authorize(true));
 
 // 사용자 관련 라우트
 router.get('/users', getUsers);
+router.post('/users', createUser);
+router.put('/users/:id', updateUser);
+router.delete('/users/:id', deleteUser);
 router.post('/users/bulk', bulkCreateUsers);
 router.post('/users/bulk-delete', bulkDeleteUsers);
 router.post('/users/:id/reset-password', resetUserPassword);
