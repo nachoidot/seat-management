@@ -142,27 +142,61 @@ exports.assignSeat = async (req, res) => {
       const endDate = new Date(timeSlot.endDate);
       endDate.setHours(23, 59, 59, 999); // 종료일의 마지막 시간
       
+      // 현재 시간을 한국 시간으로 변환
+      const nowKorea = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+      const baseDateKorea = new Date(baseDate.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+      const endDateKorea = new Date(endDate.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+      
+      // 디버깅용 로그
+      if (process.env.NODE_ENV === 'development') {
+        console.log('=== 백엔드 좌석 배정 시간 검증 ===');
+        console.log('사용자:', user.studentId, '우선순위:', user.priority);
+        console.log('현재 시간 (UTC):', now.toISOString());
+        console.log('현재 시간 (KST):', nowKorea.toISOString());
+        console.log('timeSlot:', {
+          title: timeSlot.title,
+          baseDate: timeSlot.baseDate,
+          endDate: timeSlot.endDate,
+          active: timeSlot.active
+        });
+        console.log('baseDate 원본:', baseDate.toISOString());
+        console.log('baseDate 한국시간:', baseDateKorea.toISOString());
+        console.log('endDate 한국시간:', endDateKorea.toISOString());
+      }
+      
       // 배정 일정이 종료되었으면 접근 불가
-      if (now > endDate) {
+      if (nowKorea > endDateKorea) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('배정 일정 종료됨 - 접근 불가');
+        }
         return res.status(403).json({
           success: false,
           message: '배정 일정이 종료되었습니다.'
         });
       }
       
-      // 15:00 시간 계산
-      const commonAccessTime = new Date(baseDate);
+      // 15:00 시간 계산 (한국 시간 기준)
+      const commonAccessTime = new Date(baseDateKorea);
       commonAccessTime.setHours(15, 0, 0, 0);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('commonAccessTime:', commonAccessTime.toISOString());
+      }
       
       let canAccess = false;
       
       // 1순위와 12순위는 15:00부터 접근 가능
       if (user.priority === 1 || user.priority === 12) {
-        canAccess = now >= commonAccessTime;
+        canAccess = nowKorea >= commonAccessTime;
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('1순위/12순위 검증:');
+          console.log('접근 가능:', canAccess);
+        }
       } else {
         // 나머지 우선순위는 자신의 배정시간 또는 15:00 이후 접근 가능
-        const ownStartTime = new Date(baseDate);
-        const ownEndTime = new Date(baseDate);
+        const ownStartTime = new Date(baseDateKorea);
+        const ownEndTime = new Date(baseDateKorea);
         
         // 우선순위별 시간 설정
         const priorityTimes = {
@@ -185,19 +219,42 @@ exports.assignSeat = async (req, res) => {
           ownStartTime.setHours(hour, minute, 0, 0);
           ownEndTime.setHours(hour, minute, 30, 0);
           
-          // 자신의 배정시간 내에 있거나 15:00 이후인 경우
-          canAccess = (now >= ownStartTime && now <= ownEndTime) || now >= commonAccessTime;
+          const inOwnTime = nowKorea >= ownStartTime && nowKorea <= ownEndTime;
+          const afterCommonTime = nowKorea >= commonAccessTime;
+          canAccess = inOwnTime || afterCommonTime;
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`${user.priority}순위 시간 검증:`);
+            console.log('자신의 배정시간:', ownStartTime.toISOString(), '~', ownEndTime.toISOString());
+            console.log('공통 접근시간:', commonAccessTime.toISOString());
+            console.log('자신의 시간대에 있음:', inOwnTime);
+            console.log('공통 시간대에 있음:', afterCommonTime);
+            console.log('최종 접근 가능:', canAccess);
+          }
         } else {
           // 우선순위가 정의되지 않은 경우 15:00 이후만 접근 가능
-          canAccess = now >= commonAccessTime;
+          canAccess = nowKorea >= commonAccessTime;
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('정의되지 않은 우선순위 - 15:00 이후만 접근 가능:', canAccess);
+          }
         }
       }
       
       if (!canAccess) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('접근 권한 없음 - 403 반환');
+          console.log('==============================');
+        }
         return res.status(403).json({
           success: false,
           message: '현재 시간에 좌석 배정 권한이 없습니다.'
         });
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('접근 권한 승인 - 좌석 배정 진행');
+        console.log('==============================');
       }
     }
 
