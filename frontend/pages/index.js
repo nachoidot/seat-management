@@ -124,6 +124,21 @@ export default function Home() {
   const displayData = useMemo(() => {
     if (!timeSlots || timeSlots.length === 0 || !currentUser) return null;
     
+    // 디버깅용 로그
+    if (process.env.NODE_ENV === 'development') {
+      console.log('=== timeSlots 전체 데이터 ===');
+      console.log('timeSlots:', timeSlots);
+      console.log('timeSlots 개수:', timeSlots.length);
+      timeSlots.forEach((slot, index) => {
+        console.log(`슬롯 ${index}:`, {
+          title: slot.title,
+          baseDate: slot.baseDate,
+          endDate: slot.endDate,
+          active: slot.active
+        });
+      });
+    }
+    
     const activeSlots = timeSlots.filter(slot => slot && slot.active);
     const displaySlot = activeSlots.length > 0 
       ? activeSlots.reduce((latest, current) => {
@@ -152,15 +167,41 @@ export default function Home() {
       let statusClass = '';
       let accessTimeText = '';
       
+      // 디버깅용 로그 (3순위만)
+      if (process.env.NODE_ENV === 'development' && priority === 3) {
+        console.log('=== index.js 3순위 디버깅 ===');
+        console.log('displaySlot:', displaySlot);
+        console.log('baseDate string:', displaySlot.baseDate);
+        console.log('endDate string:', displaySlot.endDate);
+        console.log('baseDate object:', new Date(displaySlot.baseDate));
+        console.log('endDate object:', new Date(displaySlot.endDate));
+        console.log('priority:', priority);
+        console.log('accessTimeSlots:', accessTimeSlots);
+        console.log('현재 시간:', now.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+      }
+      
       if (accessTimeSlots.length === 0) {
         status = '준비 중';
         statusClass = 'text-gray-500';
         accessTimeText = '시간 미정';
+        
+        if (process.env.NODE_ENV === 'development' && priority === 3) {
+          console.log('3순위 - accessTimeSlots가 빈 배열입니다!');
+        }
       } else {
         // 현재 접근 가능한지 확인
         const canAccess = accessTimeSlots.some(slot => 
           now >= slot.start && now <= slot.end
         );
+        
+        if (process.env.NODE_ENV === 'development' && priority === 3) {
+          console.log('3순위 canAccess 체크:');
+          accessTimeSlots.forEach((slot, index) => {
+            console.log(`슬롯 ${index}:`, slot.start.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}), '~', slot.end.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+            console.log(`현재 시간이 범위 내에 있는가: ${now >= slot.start && now <= slot.end}`);
+          });
+          console.log('최종 canAccess:', canAccess);
+        }
         
         if (canAccess) {
           status = '신청 가능';

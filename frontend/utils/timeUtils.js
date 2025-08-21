@@ -97,13 +97,34 @@ export const canUserAccessSeats = (baseDate, priority, endDate) => {
   const endDateTime = new Date(endDate);
   endDateTime.setHours(23, 59, 59, 999); // 종료일의 마지막 시간
   
+  // 디버깅용 로그
+  if (process.env.NODE_ENV === 'development') {
+    console.log('=== canUserAccessSeats 디버깅 ===');
+    console.log('현재 시간:', now.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+    console.log('baseDate:', baseDate);
+    console.log('priority:', priority);
+    console.log('endDate:', endDate);
+    console.log('endDateTime:', endDateTime.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+  }
+  
   // 배정 일정이 종료되었으면 접근 불가
-  if (now > endDateTime) return false;
+  if (now > endDateTime) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('배정 일정 종료됨 - 접근 불가');
+    }
+    return false;
+  }
   
   // 1순위와 12순위는 15:00부터 접근 가능
   if (priority === 1 || priority === 12) {
     const commonAccessTime = calculateCommonAccessTime(baseDate);
-    return now >= commonAccessTime;
+    const canAccess = now >= commonAccessTime;
+    if (process.env.NODE_ENV === 'development') {
+      console.log('1순위/12순위 - 15:00부터 접근');
+      console.log('commonAccessTime:', commonAccessTime.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+      console.log('접근 가능:', canAccess);
+    }
+    return canAccess;
   }
   
   // 나머지 우선순위는 자신의 배정시간 또는 15:00 이후 접근 가능
@@ -111,8 +132,23 @@ export const canUserAccessSeats = (baseDate, priority, endDate) => {
   const ownEndTime = calculateEndTimeByPriority(baseDate, priority);
   const commonAccessTime = calculateCommonAccessTime(baseDate);
   
+  const inOwnTime = now >= ownStartTime && now <= ownEndTime;
+  const afterCommonTime = now >= commonAccessTime;
+  const canAccess = inOwnTime || afterCommonTime;
+  
+  // 디버깅용 로그
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`${priority}순위 시간 계산:`);
+    console.log('자신의 배정시간:', ownStartTime?.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}), '~', ownEndTime?.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+    console.log('공통 접근시간:', commonAccessTime.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+    console.log('자신의 시간대에 있음:', inOwnTime);
+    console.log('공통 시간대에 있음:', afterCommonTime);
+    console.log('최종 접근 가능:', canAccess);
+    console.log('================================');
+  }
+  
   // 자신의 배정시간 내에 있거나 15:00 이후인 경우
-  return (now >= ownStartTime && now <= ownEndTime) || now >= commonAccessTime;
+  return canAccess;
 };
 
 /**
@@ -129,6 +165,14 @@ export const getUserAccessTimeSlots = (baseDate, priority, endDate) => {
   const endDateTime = new Date(endDate);
   endDateTime.setHours(23, 59, 59, 999);
   
+  // 디버깅용 로그
+  if (process.env.NODE_ENV === 'development') {
+    console.log('=== getUserAccessTimeSlots 디버깅 ===');
+    console.log('baseDate:', baseDate);
+    console.log('priority:', priority);
+    console.log('endDate:', endDate);
+  }
+  
   // 1순위와 12순위는 15:00부터 종료일까지
   if (priority === 1 || priority === 12) {
     const commonAccessTime = calculateCommonAccessTime(baseDate);
@@ -137,6 +181,10 @@ export const getUserAccessTimeSlots = (baseDate, priority, endDate) => {
       end: endDateTime,
       type: 'common'
     });
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('1순위/12순위 슬롯:', commonAccessTime.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}), '~', endDateTime.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+    }
   } else {
     // 나머지 우선순위는 자신의 배정시간 + 15:00 이후
     const ownStartTime = calculateStartTimeByPriority(baseDate, priority);
@@ -150,6 +198,10 @@ export const getUserAccessTimeSlots = (baseDate, priority, endDate) => {
         end: ownEndTime,
         type: 'own'
       });
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`${priority}순위 자신의 슬롯:`, ownStartTime.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}), '~', ownEndTime.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+      }
     }
     
     // 15:00 이후
@@ -158,6 +210,12 @@ export const getUserAccessTimeSlots = (baseDate, priority, endDate) => {
       end: endDateTime,
       type: 'common'
     });
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('공통 슬롯:', commonAccessTime.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}), '~', endDateTime.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}));
+      console.log('총 슬롯 수:', slots.length);
+      console.log('=============================');
+    }
   }
   
   return slots;
