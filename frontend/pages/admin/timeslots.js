@@ -121,7 +121,7 @@ export default function AdminTimeSlots() {
   const handleAddTimeSlot = async (e) => {
     e.preventDefault();
     
-    if (!newTimeSlotData.name || !newTimeSlotData.baseDate || !newTimeSlotData.endDate) {
+    if (!newTimeSlotData.title || !newTimeSlotData.baseDate || !newTimeSlotData.endDate) {
       toast.error('모든 필드를 입력해주세요.');
       return;
     }
@@ -134,7 +134,8 @@ export default function AdminTimeSlots() {
       const endDateLocal = new Date(newTimeSlotData.endDate);
       
       const timeSlotData = {
-        name: newTimeSlotData.name.trim(),
+        title: newTimeSlotData.title.trim(),
+        description: newTimeSlotData.description || '',
         baseDate: baseDateLocal.toISOString(),
         endDate: endDateLocal.toISOString(),
         active: newTimeSlotData.active
@@ -146,7 +147,8 @@ export default function AdminTimeSlots() {
         toast.success('일정이 추가되었습니다.');
         setShowAddModal(false);
         setNewTimeSlotData({
-          name: '',
+          title: '',
+          description: '',
           baseDate: '',
           endDate: '',
           active: true
@@ -523,7 +525,16 @@ export default function AdminTimeSlots() {
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setNewTimeSlotData({
+                      title: '',
+                      description: '',
+                      baseDate: '',
+                      endDate: '',
+                      active: true
+                    });
+                  }}
                   className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded mr-2"
                 >
                   취소
